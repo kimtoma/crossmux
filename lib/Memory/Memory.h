@@ -32,3 +32,23 @@ std::unique_ptr<T> makeUniqueNoThrow(size_t count) {
   using Elem = std::remove_extent_t<T>;
   return std::unique_ptr<T>(new (std::nothrow) Elem[count]());
 }
+
+// Helper struct to call a cleanup function on exit from any scope.
+// Use with a lambda to avoid unnecessary allocations from std::function/std::bind:
+// Example:
+//   auto jpeg = makeUniqueNoThrow<JPEGDEC>();
+//   ScopedCleanup cleanup{[&jpeg]{ jpeg->close(); }};
+//
+template <typename F>
+struct [[nodiscard]] ScopedCleanup final {
+  const F fn;
+  explicit ScopedCleanup(F f) : fn{std::move(f)} {}
+  ScopedCleanup(const ScopedCleanup&) = delete;
+  ScopedCleanup& operator=(const ScopedCleanup&) = delete;
+  ScopedCleanup(ScopedCleanup&&) = delete;
+  ScopedCleanup& operator=(ScopedCleanup&&) = delete;
+  ~ScopedCleanup() { fn(); }
+};
+
+template <typename F>
+ScopedCleanup(F) -> ScopedCleanup<F>;
