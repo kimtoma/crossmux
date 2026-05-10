@@ -6,8 +6,8 @@
 
 #include <cstdio>
 
-#include "../../components/UITheme.h"
-#include "../../fontIds.h"
+#include "../../../components/UITheme.h"
+#include "../../../fontIds.h"
 #include "SudokuGenerator.h"
 #include "SudokuStore.h"
 

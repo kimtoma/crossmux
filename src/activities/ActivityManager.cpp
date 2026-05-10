@@ -18,8 +18,8 @@
 #include "reader/ReaderActivity.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
-#include "gomoku/GomokuMenuActivity.h"
-#include "sudoku/SudokuMenuActivity.h"
+#include "games/gomoku/GomokuMenuActivity.h"
+#include "games/sudoku/SudokuMenuActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
 void ActivityManager::begin() {

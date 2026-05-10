@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "../Activity.h"
+#include "../../Activity.h"
 #include "GomokuBoard.h"
 #include "GomokuStore.h"
 

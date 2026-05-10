@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "../Activity.h"
+#include "../../Activity.h"
 #include "SudokuBoard.h"
 
 class SudokuGameActivity final : public Activity {
