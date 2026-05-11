@@ -397,7 +397,7 @@ void GomokuGameActivity::renderPlaying() {
 
 void GomokuGameActivity::drawTitleBar() {
   const int w = renderer.getScreenWidth();
-  renderer.drawLine(0, TITLE_BAR_H, w, TITLE_BAR_H, true);
+  renderer.drawLine(0, TITLE_BAR_H, w - 1, TITLE_BAR_H, true);
 
   const int textH = renderer.getTextHeight(kStatusFont);
   const int y = gameCenterY(TITLE_BAR_H, textH);
@@ -625,25 +625,25 @@ void GomokuGameActivity::drawModeLine() {
 void GomokuGameActivity::drawFooter() {
   const char* backLabel = "";
   const char* confirmLabel = "";
-  const char* upLabel = "";
-  const char* downLabel = "";
+  const char* leftLabel = "";
+  const char* rightLabel = "";
 
   if (state == State::Playing) {
     backLabel = tr(STR_GOMOKU_MENU);
     confirmLabel = tr(STR_GOMOKU_PLACE);
-    upLabel = tr(STR_DIR_UP);
-    downLabel = tr(STR_DIR_DOWN);
+    leftLabel = tr(STR_DIR_LEFT);
+    rightLabel = tr(STR_DIR_RIGHT);
   } else if (state == State::GameMenu) {
     backLabel = tr(STR_GAME_RESUME);
     confirmLabel = tr(STR_SELECT);
-    upLabel = tr(STR_DIR_UP);
-    downLabel = tr(STR_DIR_DOWN);
+    leftLabel = tr(STR_DIR_LEFT);
+    rightLabel = tr(STR_DIR_RIGHT);
   } else if (state == State::GameOver) {
     backLabel = tr(STR_GOMOKU_MENU);
     confirmLabel = tr(STR_GOMOKU_AGAIN);
   }
 
-  const auto labels = mappedInput.mapLabels(backLabel, confirmLabel, upLabel, downLabel);
+  const auto labels = mappedInput.mapLabels(backLabel, confirmLabel, leftLabel, rightLabel);
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
