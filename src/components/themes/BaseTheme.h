@@ -89,6 +89,7 @@ enum UIIcon {
   Gomoku,
 #ifdef ENABLE_CHINESE_VERSION
   ChineseChess,
+  WeRead,
 #endif
   Avatar
 };
