@@ -188,20 +188,33 @@ bool AirPageFace::connectBroker() {
     return false;
   }
   const std::string topic = refreshTopic();
-  mqtt_.subscribe(topic.c_str());
+  if (!mqtt_.subscribe(topic.c_str())) {
+    // Without the subscription we'd never receive refresh pushes, so don't let
+    // the UI report Live: drop the connection and let pumpMqtt retry next window.
+    LOG_ERR("AIRP", "MQTT subscribe failed: %s", topic.c_str());
+    mqtt_.disconnect();
+    return false;
+  }
   LOG_INF("AIRP", "MQTT online, subscribed %s", topic.c_str());
   return true;
 }
 
 void AirPageFace::pumpMqtt() {
-  // Bring WiFi + broker up as one throttled unit so a quick WiFi reconnect isn't
-  // followed by a needless wait before the broker connect.
+  // Runs inside tick(): it must NEVER busy-wait or Standby goes unresponsive to
+  // input. So WiFi is brought up non-blocking — kick the association and return;
+  // a later tick observes WL_CONNECTED and proceeds to the broker connect. Both
+  // steps share the kReconnectMs throttle. (doFetch still uses the blocking
+  // ensureWifi(), but only after its "Fetching…" status is already on-panel.)
   if (!mqtt_.connected()) {
     mqttState_ = MqttState::Connecting;
     const uint32_t now = millis();
     if (now - lastConnectAttemptMs_ < kReconnectMs) return;
     lastConnectAttemptMs_ = now;
-    if (!ensureWifi() || !connectBroker()) return;  // retry on the next window
+    if (WiFi.status() != WL_CONNECTED) {
+      startWifiAssociation();  // returns immediately; broker connect waits a tick
+      return;
+    }
+    if (!connectBroker()) return;  // WiFi up but broker refused; retry next window
     mqttState_ = MqttState::Online;
     needsRedraw_ = true;  // indicator: connecting -> live
   }
@@ -235,9 +248,10 @@ bool AirPageFace::tick() {
   return false;
 }
 
-bool AirPageFace::ensureWifi() {
-  if (WiFi.status() == WL_CONNECTED) return true;  // reuse e.g. NTP's connection
-
+bool AirPageFace::startWifiAssociation() {
+  // Kick WiFi.begin() from saved credentials and return immediately — no wait
+  // loop. Shared by ensureWifi() (which then polls) and pumpMqtt() (which must
+  // not block). Marks the radio as ours so teardownWifi() drops it again.
   std::string ssid;
   std::string pass;
   if (WIFI_STORE.getCredentials().empty()) WIFI_STORE.loadFromFile();
@@ -262,6 +276,14 @@ bool AirPageFace::ensureWifi() {
   } else {
     WiFi.begin(ssid.c_str(), pass.c_str());
   }
+  weBroughtWifiUp_ = true;
+  return true;
+}
+
+bool AirPageFace::ensureWifi() {
+  if (WiFi.status() == WL_CONNECTED) return true;  // reuse e.g. NTP's connection
+
+  if (!startWifiAssociation()) return false;  // no saved credential
   const uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - start) < kWifiConnectTimeoutMs) {
     delay(200);  // delay() yields to the scheduler, feeding the watchdog
@@ -270,7 +292,6 @@ bool AirPageFace::ensureWifi() {
     LOG_ERR("AIRP", "WiFi connect failed");
     return false;
   }
-  weBroughtWifiUp_ = true;
   return true;
 }
 

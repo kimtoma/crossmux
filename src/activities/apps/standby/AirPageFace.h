@@ -55,6 +55,7 @@ class AirPageFace final : public StandbyFace {
   void requestFetch();        // queue a fetch (DOWN / push / live-mode entry all funnel here)
   void doFetch();             // blocking: connect WiFi (if needed) + download to SD
   bool ensureWifi();          // blocking: reuse/raise WiFi from saved credentials
+  bool startWifiAssociation();  // non-blocking: kick WiFi.begin() and return immediately
   void teardownWifi();        // drop only WiFi we ourselves raised (lets CPU downclock)
   void pumpMqtt();            // live mode: maintain the broker connection + deliver pushes
   bool connectBroker();       // connect + subscribe (assumes WiFi already up)
