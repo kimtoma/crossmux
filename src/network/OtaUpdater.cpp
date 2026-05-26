@@ -17,7 +17,21 @@
 #include <string>
 
 namespace {
-constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
+// OTA manifest endpoint on crossmux.com. The web proxy picks the right
+// release asset for this build's variant (firmware.bin for the global build,
+// firmware-cn.bin for ENABLE_CHINESE_VERSION) and re-exposes it as a minimal
+// GitHub-release-shaped JSON whose single asset is always named
+// "firmware.bin" — that's the literal ReleaseJsonParser matches on.
+//
+// Going through the web instead of api.github.com directly avoids the
+// unauthenticated 60 req/hr/IP rate limit and the unstable mainland-China
+// path to api.github.com.
+constexpr char latestReleaseUrl[] =
+#ifdef ENABLE_CHINESE_VERSION
+    "https://crossmux.com/api/ota/manifest?variant=cn";
+#else
+    "https://crossmux.com/api/ota/manifest?variant=global";
+#endif
 
 esp_err_t http_client_set_header_cb(esp_http_client_handle_t http_client) {
   return esp_http_client_set_header(http_client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
