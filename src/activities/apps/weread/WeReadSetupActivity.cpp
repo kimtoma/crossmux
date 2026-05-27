@@ -80,7 +80,7 @@ void WeReadSetupActivity::onSelect() {
     };
     startActivityForResult(
         std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, std::string(tr(STR_WEREAD_API_KEY_PROMPT)),
-                                                std::string(WeReadKeyStore::load()), 128, InputType::Url),
+                                                std::string(WeReadKeyStore::load()), 128, InputType::Text),
         handler);
   } else if (selected == kIdxClear && keyPresent) {
     WeReadKeyStore::clear();
