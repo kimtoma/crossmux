@@ -107,23 +107,22 @@ def pack(rows):
 
 
 def write_header(packed, path):
+    # 19 bytes/line keeps each line within the repo's clang-format ColumnLimit
+    # (120); the closing brace stays attached to the final byte to match what
+    # clang-format produces, so regenerated output is format-clean.
+    tokens = [f"0x{v:02x}" for v in packed]
     body = []
-    line = "    "
-    for i, v in enumerate(packed):
-        line += f"0x{v:02x}, "
-        if (i + 1) % 19 == 0:
-            body.append(line.rstrip())
-            line = "    "
-    if line.strip():
-        body.append(line.rstrip())
+    for i in range(0, len(tokens), 19):
+        line = "    " + ", ".join(tokens[i:i + 19])
+        line += "};" if i + 19 >= len(tokens) else ","
+        body.append(line)
     text = (
         "#pragma once\n#include <cstdint>\n\n"
         "// Image dimensions: 120x120\n"
         "// Source: src/images/Logo120.svg - regenerate via scripts/gen_boot_logo.py\n"
         "static const uint8_t Logo120[] = {\n"
-        + "\n".join(body).rstrip(", ").rstrip()
+        + "\n".join(body) + "\n"
     )
-    text = text.rstrip(", \n") + "\n};\n"
     with open(path, "w") as f:
         f.write(text)
 
