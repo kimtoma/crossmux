@@ -82,7 +82,6 @@ class ActivityManager {
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
   void goToSettings();
-  void goToUglyAvatar();
   void goToReadingStatsMenu();
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
@@ -93,14 +92,8 @@ class ActivityManager {
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
   void goToApps();
-  void goToSudoku();
-  void goToGomoku();
-  void goToMinesweeper();
-  void goToCellular();
   void goToStandby();
-  void goToGame2048();
 #ifdef ENABLE_CHINESE_VERSION
-  void goToChineseChess();
   void goToWeRead();
   void goToWeReadShelf();
   void goToWeReadSearch();

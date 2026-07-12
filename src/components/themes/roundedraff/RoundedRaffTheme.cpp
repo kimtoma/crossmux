@@ -23,6 +23,10 @@ constexpr int kSelectableRowGap = 6;
 constexpr int kTitleFontId = UI_12_FONT_ID;     // Requested main title size: 12px
 constexpr int kSubtitleFontId = SMALL_FONT_ID;  // Requested subtitle size: 8px
 constexpr int kGuideFontId = SMALL_FONT_ID;     // Closest available to requested 6px
+// GenSen UI_12 ink sits high in the line box; home menu needs a stronger nudge
+// than tabs/settings rows.
+constexpr int kMenuOpticalNudgeY = 7;
+constexpr int kCompactTextOpticalNudgeY = 7;
 
 void drawScrollBar(const GfxRenderer& renderer, Rect rect, int itemCount, int pageStartIndex, int pageItems) {
   if (itemCount <= 0 || pageItems <= 0 || itemCount <= pageItems) {
@@ -104,7 +108,7 @@ void RoundedRaffTheme::drawTabBar(const GfxRenderer& renderer, Rect rect, const 
 
     const int textWidth = renderer.getTextWidth(kTitleFontId, tab.label, EpdFontFamily::BOLD);
     const int textX = slotX + (slotWidth - textWidth) / 2;
-    const int textY = tabY + (tabHeight - renderer.getLineHeight(kTitleFontId)) / 2;
+    const int textY = tabY + (tabHeight - renderer.getLineHeight(kTitleFontId)) / 2 + kCompactTextOpticalNudgeY;
     renderer.drawText(kTitleFontId, textX, textY, tab.label, !(tab.selected), EpdFontFamily::BOLD);
   }
 
@@ -218,7 +222,8 @@ void RoundedRaffTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int butt
         menuMaxWidth, renderer.getTextWidth(kTitleFontId, truncatedLabel.c_str(), EpdFontFamily::BOLD) + kRowPaddingX);
     const bool isSelected = selectedIndex == i;
     renderer.fillRoundedRect(rowX, rowY, rowWidth, rowHeight, kMenuRadius, isSelected ? Color::Black : Color::White);
-    const int textY = rowY + (rowHeight - textLineHeight) / 2;
+    // Same GenSen UI_12 optical issue as Lyra: geometric center reads slightly high.
+    const int textY = rowY + (rowHeight - textLineHeight) / 2 + kMenuOpticalNudgeY;
     const int textX = rowX + kInteractiveInsetX;
     if (selectedIndex == i) {
       renderer.drawText(kTitleFontId, textX, textY, truncatedLabel.c_str(), false, EpdFontFamily::BOLD);
@@ -344,8 +349,8 @@ void RoundedRaffTheme::drawList(const GfxRenderer& renderer, Rect rect, int item
               renderer.truncatedText(kTitleFontId, valueText.c_str(), maxValueWidth, EpdFontFamily::REGULAR);
           const int valueW = renderer.getTextWidth(kTitleFontId, truncatedValue.c_str(), EpdFontFamily::REGULAR);
           renderer.drawText(kTitleFontId, rowX + rowWidth - kInteractiveInsetX - valueW,
-                            rowY + (rowHeight - renderer.getLineHeight(kTitleFontId)) / 2, truncatedValue.c_str(),
-                            !isSelected, EpdFontFamily::REGULAR);
+                            rowY + (rowHeight - renderer.getLineHeight(kTitleFontId)) / 2 + kCompactTextOpticalNudgeY,
+                            truncatedValue.c_str(), !isSelected, EpdFontFamily::REGULAR);
           textAreaWidth = std::max(0, textAreaWidth - valueW - kMinValueGap);
         }
       }
@@ -357,11 +362,11 @@ void RoundedRaffTheme::drawList(const GfxRenderer& renderer, Rect rect, int item
 
       if (subtitleRaw.empty()) {
         // If there is no subtitle/author, center title vertically in the full row.
-        const int centeredTitleY = rowY + (rowHeight - titleLineHeight) / 2;
+        const int centeredTitleY = rowY + (rowHeight - titleLineHeight) / 2 + kCompactTextOpticalNudgeY;
         renderer.drawText(kTitleFontId, rowX + kInteractiveInsetX, centeredTitleY, title.c_str(), !isSelected,
                           EpdFontFamily::BOLD);
       } else {
-        const int titleY = rowY + subtitleTopPadding;
+        const int titleY = rowY + subtitleTopPadding + kCompactTextOpticalNudgeY;
         const int subtitleY = titleY + titleLineHeight + subtitleInterLineGap;
         auto subtitle =
             renderer.truncatedText(kSubtitleFontId, subtitleRaw.c_str(), textAreaWidth, EpdFontFamily::REGULAR);
@@ -373,8 +378,8 @@ void RoundedRaffTheme::drawList(const GfxRenderer& renderer, Rect rect, int item
     } else {
       auto title = renderer.truncatedText(kTitleFontId, rowTitle(i).c_str(), textAreaWidth, EpdFontFamily::BOLD);
       renderer.drawText(kTitleFontId, rowX + kInteractiveInsetX,
-                        rowY + (rowHeight - renderer.getLineHeight(kTitleFontId)) / 2, title.c_str(), !isSelected,
-                        EpdFontFamily::BOLD);
+                        rowY + (rowHeight - renderer.getLineHeight(kTitleFontId)) / 2 + kCompactTextOpticalNudgeY,
+                        title.c_str(), !isSelected, EpdFontFamily::BOLD);
     }
   }
 

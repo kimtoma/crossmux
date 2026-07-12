@@ -115,17 +115,10 @@ enum UIIcon {
   Hotspot,
   Bookmark,
   Apps,
-  Sudoku,
-  Gomoku,
 #ifdef ENABLE_CHINESE_VERSION
-  ChineseChess,
   WeRead,
 #endif
-  Minesweeper,
-  Avatar,
-  Cellular,
   Standby,
-  Game2048,
 };
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };

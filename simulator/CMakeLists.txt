@@ -138,7 +138,6 @@ file(GLOB_RECURSE CROSSPOINT_LIB
     "${REPO_ROOT}/lib/XmlParserUtils/*.cpp"
     "${REPO_ROOT}/lib/Xtc/*.cpp"
     "${REPO_ROOT}/lib/ZipFile/*.cpp"
-    "${REPO_ROOT}/lib/AvatarGen/*.cpp"
 )
 
 # Real HAL .cpp is replaced by simulator/hal/.
@@ -306,12 +305,11 @@ target_include_directories(crosspoint_simulator PRIVATE
     ${qrcode_SOURCE_DIR}/src
     ${REPO_ROOT}/lib/KOReaderSync
     ${REPO_ROOT}/lib/Epub/Epub/converters
-    ${REPO_ROOT}/lib/AvatarGen
 )
 
 # Rename Arduino entry points so the simulator entry can drive them explicitly.
 # ENABLE_CHINESE_VERSION is on for both native and WASM: the browser demo ships the
-# Chinese build (CJK fonts + WeRead/中国象棋/农历/CJK typography), with the startup
+# Chinese build (CJK fonts + WeRead/农历/CJK typography), with the startup
 # language following navigator.language (see simulator_main_wasm.cpp --lang).
 target_compile_definitions(crosspoint_simulator PRIVATE
     CROSSPOINT_EMULATED=1

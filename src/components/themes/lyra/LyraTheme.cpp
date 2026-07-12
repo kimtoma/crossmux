@@ -13,29 +13,22 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "components/icons/apps.h"
-#include "components/icons/avatar.h"
 #include "components/icons/book.h"
 #include "components/icons/book24.h"
 #include "components/icons/bookmark.h"
-#include "components/icons/cellular.h"
 #ifdef ENABLE_CHINESE_VERSION
-#include "components/icons/chinese_chess.h"
 #include "components/icons/weread.h"
 #endif
 #include "components/icons/cover.h"
 #include "components/icons/file24.h"
 #include "components/icons/folder.h"
 #include "components/icons/folder24.h"
-#include "components/icons/game2048.h"
-#include "components/icons/gomoku.h"
 #include "components/icons/hotspot.h"
 #include "components/icons/image24.h"
 #include "components/icons/library.h"
-#include "components/icons/minesweeper.h"
 #include "components/icons/recent.h"
 #include "components/icons/settings2.h"
 #include "components/icons/standby.h"
-#include "components/icons/sudoku.h"
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
 #include "components/icons/wifi.h"
@@ -90,26 +83,12 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return BookmarkIcon;
       case UIIcon::Apps:
         return AppsIcon;
-      case UIIcon::Sudoku:
-        return SudokuIcon;
-      case UIIcon::Gomoku:
-        return GomokuIcon;
 #ifdef ENABLE_CHINESE_VERSION
-      case UIIcon::ChineseChess:
-        return ChineseChessIcon;
       case UIIcon::WeRead:
         return WeReadIcon;
 #endif
-      case UIIcon::Minesweeper:
-        return MinesweeperIcon;
-      case UIIcon::Avatar:
-        return AvatarIcon;
-      case UIIcon::Cellular:
-        return CellularIcon;
       case UIIcon::Standby:
         return StandbyIcon;
-      case UIIcon::Game2048:
-        return Game2048Icon;
       default:
         return nullptr;
     }
@@ -563,19 +542,19 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
     const char* label = labelStr.c_str();
     int textX = tileRect.x + 16;
     const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-    int textY = tileRect.y + (LyraMetrics::values.menuRowHeight - lineHeight) / 2;
+    // GenSen UI_12 ink sits high in the line box (low ascender vs advanceY).
+    // Text needs a stronger nudge than icons.
+    constexpr int kMenuIconNudgeY = 3;
+    constexpr int kMenuTextNudgeY = 7;
+    const int textY = tileRect.y + (LyraMetrics::values.menuRowHeight - lineHeight) / 2 + kMenuTextNudgeY;
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);
       const uint8_t* iconBitmap = iconForName(icon, mainMenuIconSize);
       if (iconBitmap != nullptr) {
-        // Center the 32px icon in the row, then align the label to the icon's
-        // vertical midpoint. (Previously iconTopY = textY + 3, which sat ~4px
-        // low once GenSen's taller UI_12 line height raised textY.)
-        const int iconTopY = tileRect.y + (LyraMetrics::values.menuRowHeight - mainMenuIconSize) / 2 + 2;
+        const int iconTopY = tileRect.y + (LyraMetrics::values.menuRowHeight - mainMenuIconSize) / 2 + kMenuIconNudgeY;
         renderer.drawIcon(iconBitmap, textX, iconTopY, mainMenuIconSize, mainMenuIconSize);
         textX += mainMenuIconSize + hPaddingInSelection + 2;
-        textY = iconTopY + mainMenuIconSize / 2 - lineHeight / 2 + 1;
       }
     }
 

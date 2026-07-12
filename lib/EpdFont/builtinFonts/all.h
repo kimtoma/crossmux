@@ -17,7 +17,6 @@
 //     LARGE/EXTRA_LARGE (intended for English EPUB). Chinese EPUB text
 //     at these sizes shows blank for any char outside the i18n subset;
 //     UI strings still render because their chars are always included.
-#include <builtinFonts/chinese_chess_16.h>
 #include <builtinFonts/notosans_cjk_8.h>
 #include <builtinFonts/notosans_cjk_10.h>
 #include <builtinFonts/notosans_cjk_12.h>
