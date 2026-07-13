@@ -1,6 +1,6 @@
 # ryOS CrossMux
 
-**English** | [中文](./README.md)
+**English** | [中文](./README.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
 
 ryOS CrossMux is reading-first firmware for the Xteink X3 and X4. It is a fork of
 [CrossMux](https://github.com/0x1abin/crossmux), built on
