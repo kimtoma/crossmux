@@ -131,7 +131,7 @@ recovery details.
 > **USB-locked device warning**
 >
 > The Xteink Unlocker officially supports CrossPoint and CrossInk. ryOS
-> ryOS CrossMux is a community fork. Flashing it to a USB-locked device can leave the
+> CrossMux is a community fork. Flashing it to a USB-locked device can leave the
 > device permanently stuck without a supported recovery path. Do not install
 > this fork on a locked unit unless you already have a verified way to recover
 > it.
