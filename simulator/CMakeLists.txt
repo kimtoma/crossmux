@@ -236,8 +236,16 @@ option(SIMULATOR_CHINESE_UI_SIMPLIFIED "Build Simplified Chinese simulator SKU" 
 option(SIMULATOR_JAPANESE_VERSION "Build Japanese simulator SKU" OFF)
 option(SIMULATOR_KOREAN_VERSION "Build Korean simulator SKU" OFF)
 
-math(EXPR _SIM_CJK_SKU_COUNT "\
-  ${SIMULATOR_CHINESE_UI_SIMPLIFIED} + ${SIMULATOR_JAPANESE_VERSION} + ${SIMULATOR_KOREAN_VERSION}")
+set(_SIM_CJK_SKU_COUNT 0)
+if(SIMULATOR_CHINESE_UI_SIMPLIFIED)
+    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+endif()
+if(SIMULATOR_JAPANESE_VERSION)
+    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+endif()
+if(SIMULATOR_KOREAN_VERSION)
+    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+endif()
 if(_SIM_CJK_SKU_COUNT GREATER 1)
     message(FATAL_ERROR
         "Pick at most one of SIMULATOR_CHINESE_UI_SIMPLIFIED / "
@@ -308,6 +316,12 @@ add_custom_command(
     COMMENT ${I18N_GEN_COMMENT}
 )
 add_custom_target(i18n_generated DEPENDS ${I18N_GENERATED})
+
+# WeRead is Chinese-SKU only (mirrors PlatformIO build_src_filter). Exclude
+# before add_executable so JA/KO builds don't reference gated ActivityManager APIs.
+if(SIMULATOR_JAPANESE_VERSION OR SIMULATOR_KOREAN_VERSION)
+    list(FILTER CROSSPOINT_SRC EXCLUDE REGEX "activities/apps/weread/")
+endif()
 
 # Entry point + windowing. Native drives an SDL window/event loop; WASM has no window
 # (rendering + input are owned by the browser), so it uses a minimal entry point.
