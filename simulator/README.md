@@ -70,6 +70,18 @@ cmake -S simulator -B simulator/build
 cmake --build simulator/build -j
 ```
 
+Default native/WASM builds enable `ENABLE_CHINESE_VERSION` with **Traditional**
+fonts/remap (like `gh_release_tc`). For a **Simplified** SKU (like
+`gh_release_sc`), use a separate build directory and
+`-DSIMULATOR_CHINESE_UI_SIMPLIFIED=ON` — gen_i18n writes into shared
+`lib/I18n/` headers, so TC and SC cannot share one build tree:
+
+```sh
+cmake -S simulator -B simulator/build_sc -DSIMULATOR_CHINESE_UI_SIMPLIFIED=ON
+cmake --build simulator/build_sc -j
+./simulator/build_sc/crosspoint_simulator --scale 1 --sd-root ./simulator/sd_root_sc
+```
+
 CMake fetches ArduinoJson and `ricmoo/QRCode` via `FetchContent` on first configure
 (shallow clones, a few seconds).
 
