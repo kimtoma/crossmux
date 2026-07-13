@@ -3,12 +3,12 @@
 # Generates per-size Korean font headers for ENABLE_KOREAN_VERSION.
 # Coverage tiers (no OpenCC / no Han conversion):
 #
-#   8/10pt    : i18n + modern jamo only (ko_i18n_chars.txt) — UI chrome;
-#               every korean.yaml glyph is force-included. Full Hangul at
-#               these sizes overflows the 0x640000 OTA slot.
-#   12pt      : ALL modern Hangul (11 172) ∪ 기초 한자 1800 ∪ jamo ∪ i18n
-#               (ko_common_chars.txt)
-#   14pt      : same pool + extended EPUB symbols
+#   8/10/12pt : i18n + modern jamo only (ko_i18n_chars.txt) — UI chrome +
+#               SMALL reader; every korean.yaml glyph is force-included.
+#               Full Hangul at 8/10/12 as well as 14 overflows the 0x640000
+#               OTA slot (~1.5 MiB over).
+#   14pt      : ALL modern Hangul (11 172) ∪ 기초 한자 1800 ∪ jamo ∪ i18n
+#               + extended EPUB symbols (reader MEDIUM default)
 #   16/18pt   : i18n + modern jamo only (ko_i18n_chars.txt)
 #
 # Source face: Resource Han Rounded KR Regular
@@ -17,7 +17,7 @@
 #
 # Hangul syllables are listed explicitly in chars_ko_hangul_all.txt (fed via
 # --text-file). Do not add a bare U+AC00–D7A3 range to --unicodes for the
-# i18n-only OTF — that would inflate 8/10/16/18pt. Do not list full
+# i18n-only OTF — that would inflate 8/10/12/16/18pt. Do not list full
 # U+1100–11FF in --unicodes (pulls obsolete jamo).
 #
 # Set PYTHON=/path/to/venv/bin/python to override.
@@ -32,14 +32,12 @@ SOURCE_OTF="../builtinFonts/source/ResourceHanRoundedKR/ResourceHanRoundedKR-Reg
 CHARSET_FILE="ko_common_chars.txt"
 REQUIRE_FROM=(../../I18n/translations/korean.yaml chars_ko_jamo.txt)
 TMP_DIR="instanced_fonts/ResourceHanRoundedKR"
-SUBSET_OTF="$TMP_DIR/ResourceHanRoundedKR-R.kocommon.otf"
 LARGE_OTF="$TMP_DIR/ResourceHanRoundedKR-R.kolarge.otf"
 I18N_OTF="$TMP_DIR/ResourceHanRoundedKR-R.i18nonly.otf"
 I18N_CHARSET_FILE="ko_i18n_chars.txt"
 
-KO_FONT_SIZES_SMALL=(12)
 KO_FONT_SIZES_LARGE=(14)
-KO_FONT_SIZES_I18N=(8 10 16 18)
+KO_FONT_SIZES_I18N=(8 10 12 16 18)
 
 # Resource Han Rounded is Source-Han-derived like GenSen; reuse GenSen-tuned metrics.
 baseline_adjust_for() {
@@ -100,18 +98,7 @@ fi
 KO_UNICODEM="U+0020-007E,U+00A0-00FF,U+2010-2026,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
 KO_UNICODEM_LARGE="U+0020-007E,U+00A0-00FF,U+2010-2026,U+2030-205F,U+2070-209F,U+20A0-20CF,U+2150-218F,U+2190-21FF,U+2200-22FF,U+2460-24FF,U+2500-257F,U+2580-259F,U+25A0-25FF,U+2600-26FF,U+2700-27BF,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
 
-echo "Subsetting $(basename "$SOURCE_OTF") -> common (all Hangul + Hanja 1800)..."
-"$PYTHON" -m fontTools.subset "$SOURCE_OTF" \
-  --output-file="$SUBSET_OTF" \
-  --text-file="$CHARSET_FILE" \
-  --unicodes="$KO_UNICODEM" \
-  --layout-features='*' \
-  --notdef-outline \
-  --recommended-glyphs \
-  --no-hinting \
-  --drop-tables+=DSIG,GSUB,GPOS
-
-echo "Subsetting $(basename "$SOURCE_OTF") -> large (common + symbols)..."
+echo "Subsetting $(basename "$SOURCE_OTF") -> large (all Hangul + Hanja 1800 + symbols)..."
 "$PYTHON" -m fontTools.subset "$SOURCE_OTF" \
   --output-file="$LARGE_OTF" \
   --text-file="$CHARSET_FILE" \
@@ -180,9 +167,6 @@ LARGE_EXTRA_INTERVALS=(
   --additional-intervals 0x2700,0x27BF
 )
 
-for size in "${KO_FONT_SIZES_SMALL[@]}"; do
-  emit_size "$size" "$SUBSET_OTF"
-done
 for size in "${KO_FONT_SIZES_LARGE[@]}"; do
   emit_size "$size" "$LARGE_OTF" "${LARGE_EXTRA_INTERVALS[@]}"
 done
