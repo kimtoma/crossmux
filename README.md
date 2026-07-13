@@ -9,7 +9,7 @@ coverage, reliable SD-card fonts, and faster 4-level grayscale text. It keeps
 reading stats, WeRead, and standby faces. The old game and toy apps are not part
 of the firmware.
 
-Current firmware version: **1.4.2**
+Current firmware version: **1.4.3**
 
 ![ryOS CrossMux running on an Xteink device](./docs/images/cover.jpg)
 
@@ -41,8 +41,8 @@ The `gh_release_cn` environment builds a Chinese-first firmware with:
 - built-in GenSen Rounded TW bitmap fonts
 - CJK line-breaking and punctuation rules
 - WeRead shelf, notes, reviews, search, recommendations, and offline SD cache
-- the same dual-slot firmware layout and rollback support as the international
-  build
+- OTA updates from `ryokun6/crossmux` releases, using the Chinese firmware asset
+- the same dual-slot firmware layout and rollback support as the international build
 
 The default 14 pt reader font carries roughly 7,000 common ideographs plus
 symbols used by modern EPUBs. Smaller UI sizes use tighter subsets to stay
@@ -108,9 +108,10 @@ ryOS CrossMux keeps the main CrossPoint reader:
 - international UI translations and RTL interface support
 
 Wireless tools include file transfer, the EPUB Optimizer, web settings, fast
-WebSocket uploads, WebDAV, Calibre wireless connection, and OPDS browsing.
-Network OTA is disabled in this fork. Install firmware with a custom `.bin`
-through USB, the web flasher, or `SD Card Firmware Update`.
+WebSocket uploads, WebDAV, Calibre wireless connection, OPDS browsing, and
+network OTA from the latest `ryokun6/crossmux` GitHub release. OTA selects
+`firmware.bin` or `firmware-cn.bin` to match the installed build. Firmware can
+also be installed through USB, the web flasher, or `SD Card Firmware Update`.
 
 ## X3 and X4 support
 

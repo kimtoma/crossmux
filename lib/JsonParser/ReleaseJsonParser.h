@@ -7,7 +7,7 @@
 
 class ReleaseJsonParser {
  public:
-  ReleaseJsonParser();
+  explicit ReleaseJsonParser(const char* firmwareAssetName = "firmware.bin");
 
   ReleaseJsonParser(const ReleaseJsonParser&) = delete;
   ReleaseJsonParser& operator=(const ReleaseJsonParser&) = delete;
@@ -49,6 +49,7 @@ class ReleaseJsonParser {
 
   void commitAsset();
 
+  char firmwareAssetName[32];
   StreamingJsonParser parser;
 
   Position position;

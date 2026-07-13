@@ -193,7 +193,7 @@ When editing related source assets, regenerate via normal build steps/scripts.
 ## Key directories
 
 - `src/`: app orchestration, settings/state, and activity implementations
-- `src/network/`: web server, network clients, and local firmware flashing support
+- `src/network/`: web server, network clients, and OTA/local firmware update support
 - `src/components/`: theming and shared UI components
 - `lib/hal/`: hardware abstraction wrappers around open-x4-sdk
 - `lib/Epub/`: EPUB parser, layout, CSS handling, and hyphenation
