@@ -20,9 +20,9 @@
 #include "ChineseCalendarFace.h"
 #endif
 #include "AirPageFace.h"
+#include "CrossPointSettings.h"
 #include "SloppyClockFace.h"
 #include "StandbyTime.h"
-#include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"

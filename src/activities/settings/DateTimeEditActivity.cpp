@@ -62,7 +62,8 @@ void DateTimeEditActivity::onEnter() {
     HalClock::epochToUtc(localEpoch, local);
     year = std::clamp(static_cast<int>(local.year), MIN_YEAR, MAX_YEAR);
     month = static_cast<unsigned>(std::clamp(static_cast<int>(local.month), MIN_MONTH, MAX_MONTH));
-    day = static_cast<unsigned>(std::clamp(static_cast<int>(local.day), MIN_DAY, static_cast<int>(getDaysInMonth(year, month))));
+    day = static_cast<unsigned>(
+        std::clamp(static_cast<int>(local.day), MIN_DAY, static_cast<int>(getDaysInMonth(year, month))));
     hour = local.hour;
     minute = local.minute;
   }

@@ -2,10 +2,10 @@
 // clock as the UTC source so date/time settings can be exercised without a DS3231.
 
 #include <HalClock.h>
-
-#include <cstdio>
 #include <sys/time.h>
 #include <time.h>
+
+#include <cstdio>
 
 HalClock halClock;
 
@@ -135,12 +135,13 @@ bool HalClock::formatDateTime(char* buf, const size_t bufSize, uint8_t utcOffset
 
   if (utcOffsetQuarterHoursBiased > 104) utcOffsetQuarterHoursBiased = 104;
   const int offsetQuarterHours = static_cast<int>(utcOffsetQuarterHoursBiased) - 48;
-  const int64_t totalSeconds = static_cast<int64_t>(utcToEpoch(utc)) + static_cast<int64_t>(offsetQuarterHours) * 15 * 60;
+  const int64_t totalSeconds =
+      static_cast<int64_t>(utcToEpoch(utc)) + static_cast<int64_t>(offsetQuarterHours) * 15 * 60;
   const time_t localEpoch = static_cast<time_t>(totalSeconds);
   tm local{};
   gmtime_r(&localEpoch, &local);
-  snprintf(buf, bufSize, "%04d-%02d-%02d %02d:%02d", local.tm_year + 1900, local.tm_mon + 1, local.tm_mday, local.tm_hour,
-           local.tm_min);
+  snprintf(buf, bufSize, "%04d-%02d-%02d %02d:%02d", local.tm_year + 1900, local.tm_mon + 1, local.tm_mday,
+           local.tm_hour, local.tm_min);
   return true;
 }
 
