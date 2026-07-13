@@ -48,8 +48,8 @@ static unsigned long allowSleepAt = 0;
 #ifdef ENABLE_CHINESE_VERSION
 // Chinese builds: each Latin EpdFont global aliases the matching-size CJK
 // header symbol notosans_cjk_{8,10,12,14,16,18}. Traditional SKUs include
-// GenSen TW headers; Simplified SKUs include Source Han Sans CN headers
-// (notosans_sc_*.h) that define the same symbols. Remap at glyph lookup:
+// GenSen TW headers; Simplified SKUs include GenSen TW headers subset for
+// SC codepoints (notosans_sc_*.h) that define the same symbols. Remap at glyph lookup:
 // ScToTcRemap (TW) or TcToScRemap (SC). Bold/italic share Regular.
 //
 // CJK character coverage is non-uniform across sizes (see

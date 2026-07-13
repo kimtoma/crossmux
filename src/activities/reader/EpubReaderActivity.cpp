@@ -737,6 +737,12 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       bookmarkMessageTime = millis();
       break;
     }
+    case EpubReaderMenuActivity::MenuAction::ROTATE_SCREEN:
+    case EpubReaderMenuActivity::MenuAction::TOGGLE_WRITING_MODE:
+    case EpubReaderMenuActivity::MenuAction::AUTO_PAGE_TURN:
+      // These cycle values inside EpubReaderMenuActivity and never finish with
+      // this action; listed for switch exhaustiveness.
+      break;
   }
 }
 

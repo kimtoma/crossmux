@@ -2,8 +2,9 @@
 
 #ifdef ENABLE_CHINESE_VERSION
 #ifdef CHINESE_UI_SIMPLIFIED
-// Simplified Chinese build: SC-keyed CJK headers from Source Han Sans CN.
-// Traditional EPUB codepoints remap at runtime (TcToScRemap.h).
+// Simplified Chinese build: SC-keyed CJK headers from GenSen Rounded TW
+// (subset by Simplified codepoints). Traditional EPUB codepoints remap at
+// runtime (TcToScRemap.h).
 #include <builtinFonts/notosans_sc_8.h>
 #include <builtinFonts/notosans_sc_10.h>
 #include <builtinFonts/notosans_sc_12.h>

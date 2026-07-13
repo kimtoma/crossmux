@@ -232,6 +232,32 @@ endif()
 # gen_i18n writes into shared lib/I18n/ headers.
 option(SIMULATOR_CHINESE_UI_SIMPLIFIED "Build Simplified Chinese simulator SKU" OFF)
 
+# Prefer repo/.venv (has OpenCC for SC tw2sp). Override with -DI18N_PYTHON=...
+if(NOT I18N_PYTHON)
+    if(EXISTS "${REPO_ROOT}/.venv/bin/python3")
+        set(I18N_PYTHON "${REPO_ROOT}/.venv/bin/python3")
+    elseif(DEFINED ENV{VIRTUAL_ENV} AND EXISTS "$ENV{VIRTUAL_ENV}/bin/python3")
+        set(I18N_PYTHON "$ENV{VIRTUAL_ENV}/bin/python3")
+    else()
+        find_program(I18N_PYTHON NAMES python3 python REQUIRED)
+    endif()
+endif()
+if(SIMULATOR_CHINESE_UI_SIMPLIFIED)
+    execute_process(
+        COMMAND "${I18N_PYTHON}" -c "from opencc import OpenCC"
+        RESULT_VARIABLE _I18N_OPENCC_OK
+        OUTPUT_QUIET ERROR_QUIET)
+    if(NOT _I18N_OPENCC_OK EQUAL 0)
+        message(FATAL_ERROR
+            "SC simulator (SIMULATOR_CHINESE_UI_SIMPLIFIED=ON) needs OpenCC in:\n"
+            "  ${I18N_PYTHON}\n"
+            "Create/use the repo venv:\n"
+            "  python3 -m venv .venv && .venv/bin/pip install OpenCC\n"
+            "Or point CMake at a Python that has it:\n"
+            "  cmake -DI18N_PYTHON=/path/to/venv/bin/python3 ...")
+    endif()
+endif()
+
 # Generate I18n headers (mirrors what scripts/gen_i18n.py does pre-build for PlatformIO).
 # All translation YAMLs are listed as inputs so edits to any one of them re-run the
 # generator; otherwise downstream code referencing a freshly-added STR_* key would
@@ -256,7 +282,7 @@ else()
 endif()
 add_custom_command(
     OUTPUT ${I18N_GENERATED}
-    COMMAND python3 ${REPO_ROOT}/scripts/gen_i18n.py ${I18N_GEN_ARGS}
+    COMMAND "${I18N_PYTHON}" ${REPO_ROOT}/scripts/gen_i18n.py ${I18N_GEN_ARGS}
     DEPENDS ${REPO_ROOT}/scripts/gen_i18n.py ${I18N_TRANSLATIONS}
     COMMENT ${I18N_GEN_COMMENT}
 )
@@ -360,7 +386,13 @@ if(SIMULATOR_CHINESE_UI_SIMPLIFIED)
 endif()
 
 target_compile_options(crosspoint_simulator PRIVATE -fno-exceptions -fno-rtti
-    -Wno-unused-parameter -Wno-deprecated-declarations -Wno-bidi-chars)
+    -Wno-unused-parameter -Wno-deprecated-declarations)
+# -Wno-bidi-chars exists on GCC (PlatformIO) but not Apple Clang — only add if supported.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wno-bidi-chars HAS_WNO_BIDI_CHARS)
+if(HAS_WNO_BIDI_CHARS)
+    target_compile_options(crosspoint_simulator PRIVATE -Wno-bidi-chars)
+endif()
 # Host clang does not get Arduino/ESP transitive includes that pull in
 # <cmath>/<algorithm>/<cstdint>. Force them so firmware sources that use
 # std::round/std::clamp/uint32_t compile without ESP toolchain headers.

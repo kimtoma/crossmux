@@ -110,6 +110,11 @@ def parse_yaml_file(filepath: str) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+# Cached OpenCC converter — constructing OpenCC("tw2sp") per string reloads
+# dictionaries (~5 s for ~800 UI strings vs ~10 ms with one shared instance).
+_opencc_tw2sp = None
+
+
 def _opencc_tw2sp_convert(text: str) -> str:
     """Taiwan Traditional → Mainland Simplified via OpenCC tw2sp (lazy import).
 
@@ -118,14 +123,17 @@ def _opencc_tw2sp_convert(text: str) -> str:
     post-pass covers idiomatic mainland UI wording OpenCC leaves incomplete
     (自订→自定义, 当机→崩溃, 竖屏/横屏, 默认, …).
     """
-    try:
-        from opencc import OpenCC
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "OpenCC is required to synthesize ZH_CN from Traditional chinese.yaml. "
-            "Install with: pip install OpenCC"
-        ) from exc
-    out = OpenCC("tw2sp").convert(text)
+    global _opencc_tw2sp
+    if _opencc_tw2sp is None:
+        try:
+            from opencc import OpenCC
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "OpenCC is required to synthesize ZH_CN from Traditional chinese.yaml. "
+                "Install with: pip install OpenCC"
+            ) from exc
+        _opencc_tw2sp = OpenCC("tw2sp")
+    out = _opencc_tw2sp.convert(text)
     # Longest-first phrase overrides for mainland UI idioms tw2sp misses.
     for tw_sc, cn in (
         ("快显窗口", "弹窗"),

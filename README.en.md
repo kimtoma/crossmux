@@ -11,7 +11,7 @@ coverage, reliable SD-card fonts, and faster 4-level grayscale text. It keeps
 reading stats, WeRead, and standby faces. The old game and toy apps are not part
 of the firmware.
 
-Current firmware version: **1.4.5**
+Current firmware version: **1.4.6**
 
 ![ryOS CrossMux running on an Xteink device](./docs/images/xteink-vertical-reading.jpg)
 
@@ -44,8 +44,9 @@ Two Chinese SKUs ship alongside international:
 | `gh_release_sc` | `zh-CN` | Simplified Chinese (from Taiwan-terminology YAML via OpenCC `tw2sp`) | `firmware-sc.bin` |
 
 Both include English + Chinese UI, CJK line-breaking, WeRead, dual-slot OTA from
-`ryokun6/crossmux`, and embedded CJK bitmap fonts (GenSen TW for TC; Source Han
-Sans CN for SC).
+`ryokun6/crossmux`, and embedded CJK bitmap fonts from GenSen Rounded TW
+(Traditional SKU stores TC-keyed bitmaps; Simplified SKU subsets the same OTF
+by SC codepoints so glyph shapes stay Simplified).
 
 **Automatic text conversion while reading:** book codepoints are remapped at
 glyph lookup so you can open the same EPUB/TXT on either SKU. The Traditional

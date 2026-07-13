@@ -8,7 +8,7 @@
 
 本 fork 專注於中文與 CJK 書籍：直排 EPUB、更廣的字體覆蓋、可靠的 SD 卡字體，以及更快的 4 級灰階文字。閱讀統計、微信讀書與待機表盤予以保留；舊有的遊戲與玩具類應用不在固件中。
 
-**當前固件版本：** 1.4.5
+**當前固件版本：** 1.4.6
 
 ![ryOS CrossMux 運行在 Xteink 設備上](./docs/images/xteink-vertical-reading.jpg)
 
@@ -41,7 +41,7 @@
 
 - 首次開機預設為對應中文語系
 - 英文 + 中文 UI、CJK 斷行與標點、微信讀書、雙槽 OTA（來源 `ryokun6/crossmux`）
-- 內嵌 CJK 點陣字體（繁體版 GenSen TW；簡體版 Source Han Sans CN）
+- 內嵌 CJK 點陣字體（繁體／簡體皆用 GenSen TW；簡體版以簡體碼位子集化）
 
 **正文自動轉換：** 閱讀時會依固件方向對 EPUB／TXT 碼位做字形對應——繁體固件把簡體字對到繁體點陣，簡體固件把繁體字對到簡體點陣——因此同一本書不必另存一份字形。UI 字串則在建置時轉換（簡體版用 OpenCC `tw2sp`，含「檔案→文件」等大陸用語）。
 
@@ -134,7 +134,13 @@ pio run -e gh_release_sc -t upload
 bash lib/EpdFont/scripts/build-cn-builtin-fonts.sh
 ```
 
-簡體版字體管線見 [docs/engineering/chinese-build.md](./docs/engineering/chinese-build.md)。
+簡體版亦使用同一份 GenSen OTF（以簡體碼位子集化）：
+
+```bash
+bash lib/EpdFont/scripts/build-sc-builtin-fonts.sh
+```
+
+完整說明見 [docs/engineering/chinese-build.md](./docs/engineering/chinese-build.md)。
 
 ## 中文閱讀注意事項
 

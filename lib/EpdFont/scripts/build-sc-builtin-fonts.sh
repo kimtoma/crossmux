@@ -2,8 +2,10 @@
 #
 # Generates Simplified-Chinese (SC) per-size CJK font headers for
 # CHINESE_UI_SIMPLIFIED builds. Coverage tiers match the Traditional pipeline
-# but codepoints stay Simplified (no --traditional) and the source face is
-# Source Han Sans CN Regular.
+# but codepoints stay Simplified (no --traditional). Source face is the same
+# GenSen Rounded 2 TW Regular OTF used by build-cn-builtin-fonts.sh — subset
+# by SC codepoints so bitmaps keep Mainland simplified shapes; runtime remaps
+# Traditional EPUB codepoints via TcToScRemap.h.
 #
 # Output headers: notosans_sc_{8,10,12,14,16,18}.h
 # Also regenerates TcToScRemap.h.
@@ -16,22 +18,23 @@ cd "$(dirname "$0")"
 
 PYTHON="${PYTHON:-python3}"
 
-SOURCE_OTF="../builtinFonts/source/SourceHanSansCN/SourceHanSansCN-Regular.otf"
+SOURCE_OTF="../builtinFonts/source/GenSenRounded2TW/GenSenRounded2TW-R.otf"
 CHARSET_FILE="sc_common_chars.txt"
 I18N_CHARSET_FILE="sc_i18n_chars.txt"
 # Force-include sources (Traditional YAML is t2s'd inside build_cn_charset for SC).
 REQUIRE_FROM=(../../I18n/translations/chinese.yaml cn_almanac_chars.txt cn_weread_chars.txt)
-TMP_DIR="instanced_fonts/SourceHanSansCN"
-SUBSET_OTF="$TMP_DIR/SourceHanSansCN-Regular.sccommon.otf"
-LARGE_OTF="$TMP_DIR/SourceHanSansCN-Regular.sc7000.otf"
+TMP_DIR="instanced_fonts/GenSenRounded2TW-sc"
+SUBSET_OTF="$TMP_DIR/GenSenRounded2TW-R.sccommon.otf"
+LARGE_OTF="$TMP_DIR/GenSenRounded2TW-R.sc7000.otf"
 LARGE_CHARSET_FILE_SC="chars_7000_common.txt"
 LARGE_CHARSET_FILE="$TMP_DIR/chars_7000_common_sc.txt"
-I18N_OTF="$TMP_DIR/SourceHanSansCN-Regular.i18nonly.otf"
+I18N_OTF="$TMP_DIR/GenSenRounded2TW-R.i18nonly.otf"
 
 CN_FONT_SIZES_SMALL=(8 10 12)
 CN_FONT_SIZES_LARGE=(14)
 CN_FONT_SIZES_I18N=(16 18)
 
+# Per-size metrics match GenSen Rounded TW (same as build-cn-builtin-fonts.sh).
 baseline_adjust_for() {
   local size="$1"
   case "$size" in
@@ -57,7 +60,7 @@ line_height_adjust_for() {
 
 if [ ! -f "$SOURCE_OTF" ]; then
   echo "Error: $SOURCE_OTF not found." >&2
-  echo "Drop SourceHanSansCN-Regular.otf into lib/EpdFont/builtinFonts/source/SourceHanSansCN/." >&2
+  echo "Drop GenSenRounded2TW-R.otf into lib/EpdFont/builtinFonts/source/GenSenRounded2TW/." >&2
   exit 1
 fi
 
@@ -188,5 +191,5 @@ for size in "${CN_FONT_SIZES_I18N[@]}"; do
 done
 
 echo ""
-echo "Done. Generated SC CJK font headers in ../builtinFonts/"
+echo "Done. Generated SC CJK font headers in ../builtinFonts/ (from GenSen Rounded TW)."
 echo "Runtime TC→SC remap: ../TcToScRemap.h"
