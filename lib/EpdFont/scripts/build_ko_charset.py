@@ -3,14 +3,19 @@
 Build Korean builtin-font charset lists (no OpenCC / no Han conversion).
 
 Pools:
-  - chars_ko_2350_common.txt — KS X 1001 완성형 Hangul (2350 syllables via EUC-KR)
-  - chars_ko_jamo.txt        — compatibility + choseong jamo
+  - chars_ko_hangul_all.txt  — all 11 172 *modern* Hangul syllables (U+AC00–D7A3);
+    obsolete / ancient Hangul jamo syllables are intentionally omitted
+  - chars_ko_hanja_1800.txt  — 한문 교육용 기초 한자 1800 (MOE educational Hanja)
+  - chars_ko_jamo.txt        — modern choseong/jungseong/jongseong + compatibility jamo
 
 Outputs:
-  - ko_common_chars.txt — KS X 1001 ∪ jamo ∪ --require-from (8/10/12pt)
-  - ko_i18n_chars.txt   — jamo ∪ --require-from (16/18pt)
+  - ko_common_chars.txt — Hangul-all ∪ Hanja-1800 ∪ jamo ∪ --require-from
+                          (drives 8/10/12/14pt)
+  - ko_i18n_chars.txt   — jamo ∪ --require-from only (drives 16/18pt)
 
-Any Hangul / Hanja scraped from --require-from is kept verbatim (no SC/TC remap).
+Pass `--require-from korean.yaml` (and any other UI sources) so every
+user-facing Hangul/Hanja glyph is force-included in *both* outputs.
+Hanja and Hangul from --require-from are kept verbatim (no SC/TC remap).
 """
 
 from __future__ import annotations
@@ -20,11 +25,12 @@ import re
 import sys
 from pathlib import Path
 
-# Hangul syllables, jamo, and CJK ideographs (Hanja in UI strings only).
+# Hangul syllables, jamo, and CJK ideographs (Hanja).
 KO_CHAR_RE = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣㄱ-ㆎ\u1100-\u11FF一-鿿]")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-KSX_FILE = SCRIPT_DIR / "chars_ko_2350_common.txt"
+HANGUL_FILE = SCRIPT_DIR / "chars_ko_hangul_all.txt"
+HANJA_FILE = SCRIPT_DIR / "chars_ko_hanja_1800.txt"
 JAMO_FILE = SCRIPT_DIR / "chars_ko_jamo.txt"
 OUTPUT_FILE = SCRIPT_DIR / "ko_common_chars.txt"
 I18N_OUTPUT_FILE = SCRIPT_DIR / "ko_i18n_chars.txt"
@@ -60,11 +66,12 @@ def main() -> None:
     parser.add_argument("--i18n-output", type=Path, default=I18N_OUTPUT_FILE)
     args = parser.parse_args()
 
-    ksx = load_chars(KSX_FILE)
+    hangul = load_chars(HANGUL_FILE)
+    hanja = load_chars(HANJA_FILE)
     jamo = load_chars(JAMO_FILE)
     required = load_required([Path(p) for p in args.require_from])
 
-    kept = sorted(ksx | jamo | required)
+    kept = sorted(hangul | hanja | jamo | required)
     i18n = sorted(jamo | required)
 
     out = args.output if args.output.is_absolute() else SCRIPT_DIR / args.output
@@ -72,15 +79,15 @@ def main() -> None:
     out.write_text("".join(kept), encoding="utf-8")
     i18n_out.write_text("".join(i18n), encoding="utf-8")
 
-    beyond = sorted(required - ksx - jamo)
+    beyond = sorted(required - hangul - hanja - jamo)
     print(
         f"Wrote {len(kept)} chars → {out.name} "
-        f"(ksx {len(ksx)} ∪ jamo {len(jamo)} ∪ required {len(required)})",
+        f"(hangul {len(hangul)} ∪ hanja {len(hanja)} ∪ jamo {len(jamo)} ∪ required {len(required)})",
         file=sys.stderr,
     )
     print(f"Wrote {len(i18n)} i18n/jamo chars → {i18n_out.name}", file=sys.stderr)
     if beyond:
-        print(f"[required] +{len(beyond)} beyond ksx/jamo: {''.join(beyond)}", file=sys.stderr)
+        print(f"[required] +{len(beyond)} beyond hangul/hanja/jamo: {''.join(beyond)}", file=sys.stderr)
 
 
 if __name__ == "__main__":

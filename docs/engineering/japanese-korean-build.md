@@ -32,12 +32,17 @@ pyftsubset kana Unicode ranges). Ideographs are **not** remapped SC↔TC.
 
 | Tier | Sizes | Pool | Source |
 |---|---|---|---|
-| Small | 8/10/12 | KS X 1001 Hangul 2350 ∪ jamo ∪ i18n | EUC-KR 완성형 (official) |
-| Large | 14 | KS X 1001 ∪ OpenSubtitles-derived extras ∪ jamo ∪ i18n + symbols | `chars_ko_common_large.txt` |
-| I18n | 16/18 | jamo ∪ `korean.yaml` | UI force-include |
+| Small / Large | 8/10/12/14 | **All modern** Hangul (11 172) ∪ 기초 한자 1800 ∪ modern jamo ∪ i18n | Hangul Syllables block + MOE 한문 교육용 기초 한자 |
+| I18n | 16/18 | modern jamo ∪ every glyph in `korean.yaml` | UI force-include via `--require-from` |
 
-Hangul syllables come only from `--text-file` subsets — never from a bare
-`U+AC00–D7A3` unicodes range (that would embed all 11 172 modern syllables).
+14pt additionally embeds extended EPUB symbol Unicode ranges (same as Chinese).
+Obsolete / ancient Hangul jamo (historical extensions beyond modern
+choseong/jungseong/jongseong) are **not** embedded. Hangul syllables are listed
+in `chars_ko_hangul_all.txt` and fed via `--text-file`. Hanja uses the official
+educational 1800-character list — a deliberately **small** ideograph pool (no
+SC/TC conversion). `build-ko-builtin-fonts.sh` always passes
+`korean.yaml` to `--require-from` so every UI string glyph is present at both
+the common tiers and the 16/18pt i18n-only tier.
 
 ## Regenerating fonts
 
@@ -92,9 +97,9 @@ Use **separate build directories** per SKU — `gen_i18n.py` writes shared
 | `lib/EpdFont/scripts/chars_ja_kana.txt` | Hiragana + katakana |
 | `lib/EpdFont/scripts/build_ja_charset.py` | Emits `ja_common_chars.txt` / `ja_i18n_chars.txt` |
 | `lib/EpdFont/scripts/build-ja-builtin-fonts.sh` | GenSen JP → `notosans_ja_*.h` |
-| `lib/EpdFont/scripts/chars_ko_2350_common.txt` | KS X 1001 Hangul |
-| `lib/EpdFont/scripts/chars_ko_common_large.txt` | KS X 1001 ∪ corpus extras |
-| `lib/EpdFont/scripts/chars_ko_jamo.txt` | Compatibility / choseong jamo |
+| `lib/EpdFont/scripts/chars_ko_hangul_all.txt` | All 11 172 modern Hangul syllables |
+| `lib/EpdFont/scripts/chars_ko_hanja_1800.txt` | 한문 교육용 기초 한자 1800 |
+| `lib/EpdFont/scripts/chars_ko_jamo.txt` | Modern combining + compatibility jamo (no obsolete) |
 | `lib/EpdFont/scripts/build_ko_charset.py` | Emits `ko_common_chars.txt` / `ko_i18n_chars.txt` |
 | `lib/EpdFont/scripts/build-ko-builtin-fonts.sh` | RHR KR → `notosans_ko_*.h` |
 | `lib/I18n/translations/japanese.yaml` | JA UI (`_locale: ja-JP`) |
@@ -105,7 +110,7 @@ Use **separate build directories** per SKU — `gen_i18n.py` writes shared
 
 - No bold/italic CJK bitmaps (single Regular weight), same as Chinese.
 - 16/18pt reader sizes are i18n-only by design — switch to MEDIUM (14pt) for
-  full Joyo / KS X 1001 EPUB coverage.
+  full Joyo (JA) or full modern Hangul + Hanja 1800 (KO) EPUB coverage.
 - JA/KO do **not** convert Chinese characters (no `ScToTcRemap` /
   `TcToScRemap`); mixed SC/TC EPUB text may show □ for the unmapped form if
   that codepoint was not in the Japanese/Korean subset.

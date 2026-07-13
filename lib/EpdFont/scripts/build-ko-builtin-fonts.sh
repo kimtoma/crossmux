@@ -3,14 +3,18 @@
 # Generates per-size Korean font headers for ENABLE_KOREAN_VERSION.
 # Coverage tiers (no OpenCC / no Han conversion):
 #
-#   8/10/12pt : KS X 1001 Hangul 2350 ∪ jamo ∪ i18n  (ko_common_chars.txt)
-#   14pt      : KS X 1001 ∪ corpus Hangul extras ∪ jamo ∪ i18n + symbols
-#               (chars_ko_common_large.txt ∪ jamo ∪ i18n)
-#   16/18pt   : i18n + jamo only                     (ko_i18n_chars.txt)
+#   8/10/12pt : ALL Hangul (11 172) ∪ 기초 한자 1800 ∪ jamo ∪ i18n
+#               (ko_common_chars.txt)
+#   14pt      : same pool + extended EPUB symbols
+#   16/18pt   : i18n + jamo only (ko_i18n_chars.txt)
 #
 # Source face: Resource Han Rounded KR Regular
 #   https://github.com/CyanoHao/Resource-Han-Rounded
 #   (ResourceHanRoundedKR-Regular.ttf)
+#
+# Hangul syllables are listed explicitly in chars_ko_hangul_all.txt (fed via
+# --text-file). Do not add a bare U+AC00–D7A3 range to --unicodes for the
+# i18n-only OTF — that would inflate 16/18pt.
 #
 # Set PYTHON=/path/to/venv/bin/python to override.
 
@@ -26,11 +30,8 @@ REQUIRE_FROM=(../../I18n/translations/korean.yaml chars_ko_jamo.txt)
 TMP_DIR="instanced_fonts/ResourceHanRoundedKR"
 SUBSET_OTF="$TMP_DIR/ResourceHanRoundedKR-R.kocommon.otf"
 LARGE_OTF="$TMP_DIR/ResourceHanRoundedKR-R.kolarge.otf"
-LARGE_CHARSET_FILE="$TMP_DIR/ko_large_plus_jamo.txt"
 I18N_OTF="$TMP_DIR/ResourceHanRoundedKR-R.i18nonly.otf"
 I18N_CHARSET_FILE="ko_i18n_chars.txt"
-LARGE_POOL_FILE="chars_ko_common_large.txt"
-JAMO_FILE="chars_ko_jamo.txt"
 
 KO_FONT_SIZES_SMALL=(8 10 12)
 KO_FONT_SIZES_LARGE=(14)
@@ -88,29 +89,14 @@ if [ ! -f "$CHARSET_FILE" ] || [ ! -f "$I18N_CHARSET_FILE" ]; then
   exit 1
 fi
 
-if [ ! -f "$LARGE_POOL_FILE" ] || [ ! -f "$JAMO_FILE" ]; then
-  echo "Error: $LARGE_POOL_FILE or $JAMO_FILE missing." >&2
-  exit 1
-fi
+# ASCII / Latin-1 / punctuation / fullwidth / compatibility jamo.
+# Modern Hangul syllables + Hanja + modern combining jamo come from --text-file
+# (chars_ko_hangul_all / hanja_1800 / jamo). Do NOT list U+1100–11FF here — that
+# range includes obsolete jamo the SKU intentionally omits.
+KO_UNICODEM="U+0020-007E,U+00A0-00FF,U+2010-2026,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
+KO_UNICODEM_LARGE="U+0020-007E,U+00A0-00FF,U+2010-2026,U+2030-205F,U+2070-209F,U+20A0-20CF,U+2150-218F,U+2190-21FF,U+2200-22FF,U+2460-24FF,U+2500-257F,U+2580-259F,U+25A0-25FF,U+2600-26FF,U+2700-27BF,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
 
-echo "Building 14pt large Hangul charset..."
-"$PYTHON" - <<'PY' "$LARGE_POOL_FILE" "$JAMO_FILE" "$I18N_CHARSET_FILE" "$LARGE_CHARSET_FILE"
-import sys
-from pathlib import Path
-parts = []
-for p in sys.argv[1:4]:
-    parts.extend(c for c in Path(p).read_text(encoding="utf-8") if not c.isspace())
-out = sorted(set(parts))
-Path(sys.argv[4]).write_text("".join(out), encoding="utf-8")
-print(f"  {len(out)} chars → {sys.argv[4]}", file=sys.stderr)
-PY
-
-# Hangul syllables come ONLY from --text-file (KS X 1001 / i18n). Do NOT list
-# U+AC00–D7A3 here — that would pull all 11172 modern syllables from the source.
-KO_UNICODEM="U+0020-007E,U+00A0-00FF,U+1100-11FF,U+2010-2026,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
-KO_UNICODEM_LARGE="U+0020-007E,U+00A0-00FF,U+1100-11FF,U+2010-2026,U+2030-205F,U+2070-209F,U+20A0-20CF,U+2150-218F,U+2190-21FF,U+2200-22FF,U+2460-24FF,U+2500-257F,U+2580-259F,U+25A0-25FF,U+2600-26FF,U+2700-27BF,U+3000-303F,U+3131-318E,U+FE10-FE19,U+FE30-FE48,U+FF00-FFEF,U+FFFD"
-
-echo "Subsetting $(basename "$SOURCE_OTF") → small..."
+echo "Subsetting $(basename "$SOURCE_OTF") -> common (all Hangul + Hanja 1800)..."
 "$PYTHON" -m fontTools.subset "$SOURCE_OTF" \
   --output-file="$SUBSET_OTF" \
   --text-file="$CHARSET_FILE" \
@@ -121,10 +107,10 @@ echo "Subsetting $(basename "$SOURCE_OTF") → small..."
   --no-hinting \
   --drop-tables+=DSIG,GSUB,GPOS
 
-echo "Subsetting $(basename "$SOURCE_OTF") → large..."
+echo "Subsetting $(basename "$SOURCE_OTF") -> large (common + symbols)..."
 "$PYTHON" -m fontTools.subset "$SOURCE_OTF" \
   --output-file="$LARGE_OTF" \
-  --text-file="$LARGE_CHARSET_FILE" \
+  --text-file="$CHARSET_FILE" \
   --unicodes="$KO_UNICODEM_LARGE" \
   --layout-features='*' \
   --notdef-outline \
@@ -132,7 +118,7 @@ echo "Subsetting $(basename "$SOURCE_OTF") → large..."
   --no-hinting \
   --drop-tables+=DSIG,GSUB,GPOS
 
-echo "Subsetting $(basename "$SOURCE_OTF") → i18n..."
+echo "Subsetting $(basename "$SOURCE_OTF") -> i18n..."
 "$PYTHON" -m fontTools.subset "$SOURCE_OTF" \
   --output-file="$I18N_OTF" \
   --text-file="$I18N_CHARSET_FILE" \
@@ -160,7 +146,9 @@ emit_size() {
     --baseline-adjust "$baseline_adjust" \
     --line-height-adjust "$line_height_adjust" \
     --additional-intervals 0xAC00,0xD7A3 \
-    --additional-intervals 0x1100,0x11FF \
+    --additional-intervals 0x1100,0x1112 \
+    --additional-intervals 0x1161,0x1175 \
+    --additional-intervals 0x11A8,0x11C2 \
     --additional-intervals 0x3131,0x318E \
     --additional-intervals 0x4E00,0x9FFF \
     --additional-intervals 0x3000,0x303F \
