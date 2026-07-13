@@ -15,7 +15,6 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
-#include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -24,9 +23,6 @@ int HomeActivity::getMenuItemCount() const {
   int count = 5;  // File Browser, Recents, File transfer, Settings, Apps
   if (!recentBooks.empty()) {
     count += recentBooks.size();
-  }
-  if (hasOpdsServers) {
-    count++;
   }
   return count;
 }
@@ -132,13 +128,11 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
-  hasOpdsServers = OPDS_STORE.hasServers();
-
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem);
 
   // Trigger first update
   requestUpdate();
@@ -205,15 +199,12 @@ void HomeActivity::loop() {
       onSelectBook(recentBooks[selectorIndex].path);
     } else {
       const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-      switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+      switch (indexToMenuItem(menuIndex)) {
         case HomeMenuItem::FILE_BROWSER:
           onFileBrowserOpen();
           break;
         case HomeMenuItem::RECENTS:
           onRecentsOpen();
-          break;
-        case HomeMenuItem::OPDS_BROWSER:
-          onOpdsBrowserOpen();
           break;
         case HomeMenuItem::FILE_TRANSFER:
           onFileTransferOpen();
@@ -267,11 +258,6 @@ void HomeActivity::render(RenderLock&&) {
                                         tr(STR_SETTINGS_TITLE), tr(STR_APPS_TITLE)};
   std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings, Apps};
 
-  if (hasOpdsServers) {
-    menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
-    menuIcons.insert(menuIcons.begin() + 2, Library);
-  }
-
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
     menuItems.insert(menuItems.begin(), tr(STR_CONTINUE_READING));
@@ -311,8 +297,6 @@ void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
-
-void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
 
 void HomeActivity::onAppsOpen() { activityManager.goToApps(); }
 

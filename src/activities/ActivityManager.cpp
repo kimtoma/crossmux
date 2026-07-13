@@ -226,8 +226,6 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
       initialMenuItem = HomeMenuItem::FILE_BROWSER;
     } else if (activityName == "RecentBooks") {
       initialMenuItem = HomeMenuItem::RECENTS;
-    } else if (activityName == "OpdsBookBrowser") {
-      initialMenuItem = HomeMenuItem::OPDS_BROWSER;
     } else if (activityName == "CrossPointWebServer") {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
     } else if (activityName == "Settings") {

@@ -83,6 +83,7 @@ small standalone images while preserving full figures.
 
 The firmware ships only reading-related apps:
 
+- OPDS Browser
 - Reading Stats, including history, heatmap, profile, and achievements
 - WeRead in the Chinese build
 - Standby faces, including Sloppy Clock and AirPage, plus Chinese Calendar in

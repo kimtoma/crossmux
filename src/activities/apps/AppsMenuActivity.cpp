@@ -25,6 +25,7 @@ constexpr AppEntry kAppEntries[] = {
     {StrId::STR_WEREAD_TITLE, UIIcon::WeRead, &ActivityManager::goToWeRead},
 #endif
     {StrId::STR_STANDBY_TITLE, UIIcon::Standby, &ActivityManager::goToStandby},
+    {StrId::STR_OPDS_BROWSER, UIIcon::Library, &ActivityManager::goToBrowser},
 };
 
 constexpr int kAppCount = static_cast<int>(sizeof(kAppEntries) / sizeof(kAppEntries[0]));

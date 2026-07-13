@@ -3,7 +3,7 @@
 #include "../../util/ButtonNavigator.h"
 #include "../Activity.h"
 
-// Apps menu — entry-point for non-reader sub-apps (Reading Stats, WeRead, Standby).
+// Apps menu — entry-point for reading-related tools (Reading Stats, WeRead, Standby, OPDS).
 // The list is the constexpr `kAppEntries` table in AppsMenuActivity.cpp; add a new app by
 // appending one row there and a goTo<App>() in ActivityManager. See README.md.
 class AppsMenuActivity final : public Activity {

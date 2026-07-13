@@ -2,11 +2,12 @@
 
 The `apps/` directory holds non-reader sub-applications. They share the home-screen "Apps" tile, `AppsMenuActivity`, and the conventions below.
 
-Shipped apps:
+Shipped Apps menu entries:
 
 - `reading-stats/` — reading statistics
 - `weread/` — WeRead (Chinese builds only, `ENABLE_CHINESE_VERSION`)
 - `standby/` — standby / clock screen
+- OPDS Browser — shortcut to the core OPDS activity
 
 Games and toys (sudoku, gomoku, minesweeper, 2048, cellular, avatar, chinese-chess) are **not** included in firmware.
 
