@@ -102,10 +102,12 @@ See `crosspoint-web/SIMULATOR.md` for how the artifacts are embedded and served.
 ## Run
 
 ```sh
-./simulator/build/crosspoint_simulator                    # opens 800×480 window
-./simulator/build/crosspoint_simulator --sd-root /tmp/sd  # custom sd_root
-./simulator/build/crosspoint_simulator --scale 2          # 2× window magnification
+./simulator/build/crosspoint_simulator --scale 1                    # standard 1× run
+./simulator/build/crosspoint_simulator --scale 1 --sd-root /tmp/sd  # custom sd_root
 ```
+
+Development and test runs must use explicit 1× scale. Use another scale only when
+the user specifically requests it.
 
 Keyboard mapping (matches `MappedInputManager::Button::*`):
 

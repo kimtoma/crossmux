@@ -33,13 +33,20 @@ void civilFromDays(int z, int& year, int& month, int& day) {
   month = static_cast<int>(monthPart + (monthPart < 10 ? 3 : -9));
   year += (month <= 2);
 }
+}  // namespace
 
-time_t utcToEpoch(const UtcDateTime& dt) {
+int32_t HalClock::biasedOffsetToSeconds(const uint8_t utcOffsetQuarterHoursBiased) {
+  uint8_t biased = utcOffsetQuarterHoursBiased;
+  if (biased > 104) biased = 48;
+  return (static_cast<int32_t>(biased) - 48) * 15 * 60;
+}
+
+time_t HalClock::utcToEpoch(const UtcDateTime& dt) {
   const int32_t days = daysFromCivil(static_cast<int>(dt.year), static_cast<int>(dt.month), static_cast<int>(dt.day));
   return static_cast<time_t>(days) * 86400 + dt.hour * 3600 + dt.minute * 60 + dt.second;
 }
 
-void epochToUtc(const time_t epoch, UtcDateTime& out) {
+void HalClock::epochToUtc(const time_t epoch, UtcDateTime& out) {
   if (epoch < 0) {
     out = {};
     return;
@@ -57,7 +64,6 @@ void epochToUtc(const time_t epoch, UtcDateTime& out) {
   out.minute = static_cast<uint8_t>((daySeconds % 3600) / 60);
   out.second = static_cast<uint8_t>(daySeconds % 60);
 }
-}  // namespace
 
 void HalClock::begin() {
   // Host has no DS3231; report unavailable so manual-set UI stays X3-gated.
