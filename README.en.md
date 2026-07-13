@@ -34,19 +34,24 @@ Vertical mode activates only for EPUBs whose language metadata is tagged
 Chinese, Japanese, or Korean. Other books stay horizontal even if the global
 setting is vertical.
 
-### Chinese firmware
+### Chinese firmware (Traditional and Simplified)
 
 Two Chinese SKUs ship alongside international:
 
 | Env | Locale | UI | OTA asset |
 | --- | --- | --- | --- |
-| `gh_release_tc` | `zh-TW` | Traditional (繁體中文) | `firmware-tc.bin` |
-| `gh_release_sc` | `zh-CN` | Simplified (简体中文, from Taiwan YAML via OpenCC tw2sp) | `firmware-sc.bin` |
+| `gh_release_tc` | `zh-TW` | Traditional Chinese | `firmware-tc.bin` |
+| `gh_release_sc` | `zh-CN` | Simplified Chinese (from Taiwan-terminology YAML via OpenCC `tw2sp`) | `firmware-sc.bin` |
 
-Both include English + Chinese UI strings, CJK line-breaking, WeRead, dual-slot
-OTA from `ryokun6/crossmux`, and embedded CJK bitmap fonts (GenSen TW for TC;
-Source Han Sans CN for SC). TC remaps Simplified EPUB codepoints → Traditional
-glyphs; SC remaps Traditional → Simplified.
+Both include English + Chinese UI, CJK line-breaking, WeRead, dual-slot OTA from
+`ryokun6/crossmux`, and embedded CJK bitmap fonts (GenSen TW for TC; Source Han
+Sans CN for SC).
+
+**Automatic text conversion while reading:** book codepoints are remapped at
+glyph lookup so you can open the same EPUB/TXT on either SKU. The Traditional
+build maps Simplified → Traditional bitmaps; the Simplified build maps
+Traditional → Simplified. UI strings are converted at build time — the SC SKU
+runs OpenCC `tw2sp` on the shared Taiwan YAML (e.g. 檔案 → 文件).
 
 ### Better SD-card fonts
 
@@ -166,8 +171,11 @@ git submodule update --init --recursive
 # International firmware
 pio run -e gh_release
 
-# Chinese firmware
+# Traditional Chinese (zh-TW)
 pio run -e gh_release_tc
+
+# Simplified Chinese (zh-CN)
+pio run -e gh_release_sc
 ```
 
 Build outputs:
@@ -175,6 +183,7 @@ Build outputs:
 ```text
 .pio/build/gh_release/firmware.bin
 .pio/build/gh_release_tc/firmware.bin
+.pio/build/gh_release_sc/firmware.bin
 ```
 
 ### Flash over USB
@@ -183,8 +192,11 @@ Build outputs:
 # International
 pio run -e gh_release -t upload
 
-# Chinese
+# Traditional Chinese
 pio run -e gh_release_tc -t upload
+
+# Simplified Chinese
+pio run -e gh_release_sc -t upload
 ```
 
 You can also open the
@@ -217,6 +229,8 @@ documented in [docs/sd-card-fonts.md](./docs/sd-card-fonts.md).
   intended mainly for English books.
 - Built-in CJK text has one weight. Install an SD-card family for distinct bold
   and italic Latin styles.
+- SC↔TC remapping covers the common pairs; rare characters outside the map or
+  the embedded subset can still render as □.
 - Vertical mode depends on correct `zh`, `ja`, or `ko` EPUB language metadata.
 - The desktop simulator currently models X4 geometry only. X3 display and
   peripheral testing needs real hardware.
@@ -230,6 +244,7 @@ Useful checks before opening a pull request:
 pio check -e default
 pio run -e default
 pio run -e gh_release_tc
+pio run -e gh_release_sc
 ```
 
 The ESP32-C3 has about 380 KB of usable RAM. Reader caches live on the SD card

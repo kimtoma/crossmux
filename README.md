@@ -28,19 +28,24 @@
 
 直排僅在 EPUB 語言中繼資料標為中文、日文或韓文時啓用。其他書籍即使全域設定為直排，仍維持橫排。
 
-### 中文固件
+### 中文固件（繁體／簡體）
 
-`gh_release_tc` 環境會產出以中文爲優先的固件，包含：
+國際版之外另有兩款中文固件：
 
-- 首次開機預設語言爲中文
-- 英文與中文 UI 字串（中文 UI 爲繁體）
-- 內嵌 GenSen Rounded TW 點陣字體
-- CJK 斷行與標點規則
-- 微信讀書書架、筆記、書評、搜尋、推薦與 SD 離線快取
-- 從 `ryokun6/crossmux` Release 進行 OTA，並選用中文固件資源
-- 與國際版相同的雙槽固件配置與回滾支援
+| 環境 | 語系 | UI | OTA 資源 |
+| --- | --- | --- | --- |
+| `gh_release_tc` | `zh-TW` | 繁體中文 | `firmware-tc.bin` |
+| `gh_release_sc` | `zh-CN` | 簡體中文（自台灣用語 YAML 經 OpenCC `tw2sp` 生成） | `firmware-sc.bin` |
 
-預設 14pt 閱讀字體約涵蓋 7000 個常用漢字，以及現代 EPUB 常用符號。較小的 UI 字號使用更精簡的子集以符合 ESP32-C3 Flash 預算。簡體碼位會在查字時對應到內嵌的繁體字形，因此不必爲每個點陣各存一份。
+兩款皆包含：
+
+- 首次開機預設為對應中文語系
+- 英文 + 中文 UI、CJK 斷行與標點、微信讀書、雙槽 OTA（來源 `ryokun6/crossmux`）
+- 內嵌 CJK 點陣字體（繁體版 GenSen TW；簡體版 Source Han Sans CN）
+
+**正文自動轉換：** 閱讀時會依固件方向對 EPUB／TXT 碼位做字形對應——繁體固件把簡體字對到繁體點陣，簡體固件把繁體字對到簡體點陣——因此同一本書不必另存一份字形。UI 字串則在建置時轉換（簡體版用 OpenCC `tw2sp`，含「檔案→文件」等大陸用語）。
+
+預設 14pt 閱讀字體約涵蓋 7000 個常用漢字與現代 EPUB 常用符號；較小的 UI 字號使用更精簡子集以符合 Flash 預算。
 
 ### 更好的 SD 卡字體
 
@@ -67,7 +72,7 @@
 
 ryOS CrossMux 保留上游 CrossPoint 的主要閱讀能力：EPUB 2/3、章節導覽、腳註、書籤、跳轉百分比、內嵌樣式、圖片、字距、連字符、專注閱讀、自動翻頁、方向控制、螢幕截圖、QR、KOReader 進度同步，以及 `.epub` / `.txt` / `.xtc` / `.xtch` / `.bmp` 等格式。
 
-無線工具包含檔案傳輸、EPUB Optimizer、網頁設定、WebSocket 上傳、WebDAV、Calibre 無線連線、OPDS，以及從最新 `ryokun6/crossmux` GitHub Release 進行網路 OTA。OTA 會依目前安裝的版本選擇 `firmware.bin` 或 `firmware-tc.bin`。也可透過 USB、網頁刷機器或「SD 卡固件更新」安裝。
+無線工具包含檔案傳輸、EPUB Optimizer、網頁設定、WebSocket 上傳、WebDAV、Calibre 無線連線、OPDS，以及從最新 `ryokun6/crossmux` GitHub Release 進行網路 OTA。OTA 會依目前安裝的版本選擇 `firmware.bin`、`firmware-tc.bin` 或 `firmware-sc.bin`。也可透過 USB、網頁刷機器或「SD 卡固件更新」安裝。
 
 ## X3 與 X4 支援
 
@@ -107,32 +112,36 @@ git submodule update --init --recursive
 # 國際版固件
 pio run -e gh_release
 
-# 中文固件
+# 繁體中文固件（zh-TW）
 pio run -e gh_release_tc
 
-# 建置並燒錄
+# 簡體中文固件（zh-CN）
+pio run -e gh_release_sc
+
+# 建置並燒錄（擇一）
 pio run -e gh_release_tc -t upload
+pio run -e gh_release_sc -t upload
 ```
 
 產物位於 `.pio/build/<env>/firmware.bin`。
 
 ### 重新產生 CJK 字體（可選）
 
-僅在修改字集或更新內嵌字體時需要。將 `GenSenRounded2TW-R.otf` 放到
-`lib/EpdFont/builtinFonts/source/GenSenRounded2TW/`，然後執行：
+僅在修改字集或更新內嵌字體時需要。繁體版將 `GenSenRounded2TW-R.otf` 放到
+`lib/EpdFont/builtinFonts/source/GenSenRounded2TW/` 後執行：
 
 ```bash
 bash lib/EpdFont/scripts/build-cn-builtin-fonts.sh
 ```
 
-完整說明見 [docs/engineering/chinese-build.md](./docs/engineering/chinese-build.md)。
+簡體版字體管線見 [docs/engineering/chinese-build.md](./docs/engineering/chinese-build.md)。
 
 ## 中文閱讀注意事項
 
 中文固件在有限的 Flash 空間內做了取捨：
 
-- **內嵌字體以繁體字形爲準**；簡體碼位會在執行時對應到繁體點陣。
-- **UI 字串爲繁體中文**（語言選單顯示爲「中文」）。
+- **正文會自動對應繁／簡碼位**（繁體固件 SC→TC，簡體固件 TC→SC）；罕見對應外的字仍可能顯示為 □。
+- **UI 語系依 SKU**：繁體版為繁體中文（`zh-TW`）；簡體版為大陸用語簡體（`zh-CN`，建置時由同一份台灣 YAML 經 OpenCC `tw2sp` 生成）。
 - **大號字下中文正文可能留白**：16pt / 18pt（LARGE / EXTRA_LARGE）僅內嵌 UI 所需小字集，這兩檔是爲英文 EPUB 調優。讀中文請切到 MEDIUM。
 - **無 CJK 粗體／斜體字形**：會回退爲 Regular。若需要更多字重，可在 SD 卡載入自訂字體。
 
