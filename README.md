@@ -68,6 +68,16 @@ display, instead of keeping two extra full-screen buffers in RAM. Fast glyph
 blitting and strip rejection reduce repeated work on pages with SD fonts and
 vertical columns.
 
+### Cache and image handling
+
+Section cache rebuilds write to a `.tmp` sidecar before replacing the active
+cache. If an SD card refuses to truncate or rename a stale section file, the
+reader can keep using the completed sidecar instead of failing the chapter
+rebuild.
+
+The `Large only` image mode now drops inline icons and small standalone images
+while preserving figures that are large in both source and displayed size.
+
 ### A smaller Apps menu
 
 The firmware ships only reading-related apps:
@@ -96,8 +106,8 @@ ryOS CrossMux keeps the main CrossPoint reader:
 - international UI translations and RTL interface support
 
 Wireless tools include file transfer, the EPUB Optimizer, web settings, fast
-WebSocket uploads, WebDAV, Calibre wireless connection, OPDS browsing, and OTA
-updates.
+WebSocket uploads, WebDAV, Calibre wireless connection, and OPDS browsing. The
+OTA updater is inherited from CrossMux and still follows its release channels.
 
 ## X3 and X4 support
 
@@ -206,6 +216,9 @@ documented in [docs/sd-card-fonts.md](./docs/sd-card-fonts.md).
 - Built-in CJK text has one weight. Install an SD-card family for distinct bold
   and italic Latin styles.
 - Vertical mode depends on correct `zh`, `ja`, or `ko` EPUB language metadata.
+- Built-in OTA checks `crossmux.com` or `crossmux.yunhug.com`, not releases from
+  `ryokun6/crossmux`. Flash a custom `.bin` to stay on ryOS CrossMux until this
+  fork has its own OTA channel.
 - The desktop simulator currently models X4 geometry only. X3 display and
   peripheral testing needs real hardware.
 
