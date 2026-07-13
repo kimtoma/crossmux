@@ -357,8 +357,8 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   // Accept legacy "zh" / "cn" as Traditional so renames do not look like
   // cross-SKU reflashes; still mark needsResave to rewrite as "zh-tw".
   const bool skuCompatible =
-      skuMatchesExact || (langSku[0] != '\0' && (strcmp(langSku, LEGACY_LANG_SKU_ZH) == 0 ||
-                                                 strcmp(langSku, LEGACY_LANG_SKU_CN) == 0));
+      skuMatchesExact ||
+      (langSku[0] != '\0' && (strcmp(langSku, LEGACY_LANG_SKU_ZH) == 0 || strcmp(langSku, LEGACY_LANG_SKU_CN) == 0));
 #endif
 #else
   const bool skuCompatible = skuMatchesExact;
