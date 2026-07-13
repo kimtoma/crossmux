@@ -327,6 +327,13 @@ target_compile_definitions(crosspoint_simulator PRIVATE
 
 target_compile_options(crosspoint_simulator PRIVATE -fno-exceptions -fno-rtti
     -Wno-unused-parameter -Wno-deprecated-declarations -Wno-bidi-chars)
+# Host clang does not get Arduino/ESP transitive includes that pull in
+# <cmath>/<algorithm>/<cstdint>. Force them so firmware sources that use
+# std::round/std::clamp/uint32_t compile without ESP toolchain headers.
+if(NOT EMSCRIPTEN)
+    target_compile_options(crosspoint_simulator PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/force_includes.h>")
+endif()
 
 # -----------------------------------------------------------------------------
 # WebAssembly (Emscripten) link configuration.

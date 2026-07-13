@@ -5,6 +5,7 @@
 #include <Logging.h>
 #include <Serialization.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 

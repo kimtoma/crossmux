@@ -8,6 +8,7 @@
 #include <esp_task_wdt.h>
 
 #include <cstddef>
+#include <algorithm>
 
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"

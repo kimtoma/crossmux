@@ -16,6 +16,8 @@
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
 
+#include <cmath>
+
 void SleepActivity::onEnter() {
   Activity::onEnter();
 
