@@ -225,29 +225,35 @@ if(NOT EMSCRIPTEN)
     list(APPEND CROSSPOINT_LIB ${JPEGDEC_ROOT}/src/JPEGDEC.cpp)
 endif()
 
-# CJK simulator SKU selection (mutually exclusive):
-#   default              → Traditional Chinese (gh_release_tc)
+# Simulator SKU selection (mutually exclusive):
+#   default → Traditional Chinese (gh_release_tc)
+#   SIMULATOR_INTERNATIONAL_VERSION=ON → International (default PlatformIO env)
 #   SIMULATOR_CHINESE_UI_SIMPLIFIED=ON → Simplified Chinese (gh_release_sc)
-#   SIMULATOR_JAPANESE_VERSION=ON     → Japanese (gh_release_ja)
-#   SIMULATOR_KOREAN_VERSION=ON       → Korean (gh_release_ko)
+#   SIMULATOR_JAPANESE_VERSION=ON → Japanese (gh_release_ja)
+#   SIMULATOR_KOREAN_VERSION=ON → Korean (gh_release_ko)
 # Use separate build dirs per SKU — gen_i18n writes shared lib/I18n/ headers.
+option(SIMULATOR_INTERNATIONAL_VERSION "Build international simulator SKU" OFF)
 option(SIMULATOR_CHINESE_UI_SIMPLIFIED "Build Simplified Chinese simulator SKU" OFF)
 option(SIMULATOR_JAPANESE_VERSION "Build Japanese simulator SKU" OFF)
 option(SIMULATOR_KOREAN_VERSION "Build Korean simulator SKU" OFF)
 
-set(_SIM_CJK_SKU_COUNT 0)
+set(_SIM_SKU_OVERRIDE_COUNT 0)
+if(SIMULATOR_INTERNATIONAL_VERSION)
+    math(EXPR _SIM_SKU_OVERRIDE_COUNT "${_SIM_SKU_OVERRIDE_COUNT}+1")
+endif()
 if(SIMULATOR_CHINESE_UI_SIMPLIFIED)
-    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+    math(EXPR _SIM_SKU_OVERRIDE_COUNT "${_SIM_SKU_OVERRIDE_COUNT}+1")
 endif()
 if(SIMULATOR_JAPANESE_VERSION)
-    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+    math(EXPR _SIM_SKU_OVERRIDE_COUNT "${_SIM_SKU_OVERRIDE_COUNT}+1")
 endif()
 if(SIMULATOR_KOREAN_VERSION)
-    math(EXPR _SIM_CJK_SKU_COUNT "${_SIM_CJK_SKU_COUNT}+1")
+    math(EXPR _SIM_SKU_OVERRIDE_COUNT "${_SIM_SKU_OVERRIDE_COUNT}+1")
 endif()
-if(_SIM_CJK_SKU_COUNT GREATER 1)
+if(_SIM_SKU_OVERRIDE_COUNT GREATER 1)
     message(FATAL_ERROR
-        "Pick at most one of SIMULATOR_CHINESE_UI_SIMPLIFIED / "
+        "Pick at most one of SIMULATOR_INTERNATIONAL_VERSION / "
+        "SIMULATOR_CHINESE_UI_SIMPLIFIED / "
         "SIMULATOR_JAPANESE_VERSION / SIMULATOR_KOREAN_VERSION")
 endif()
 
@@ -277,10 +283,9 @@ if(SIMULATOR_CHINESE_UI_SIMPLIFIED)
     endif()
 endif()
 
-# Generate I18n headers (mirrors what scripts/gen_i18n.py does pre-build for PlatformIO).
-# All translation YAMLs are listed as inputs so edits to any one of them re-run the
-# generator; otherwise downstream code referencing a freshly-added STR_* key would
-# fail to compile after a merge that only touched the YAMLs.
+# Generate I18n headers before every simulator build because all SKU build
+# directories share these files. gen_i18n.py leaves unchanged output untouched,
+# so rebuilding the same SKU does not trigger downstream recompilation.
 set(I18N_GENERATED
     ${REPO_ROOT}/lib/I18n/I18nKeys.h
     ${REPO_ROOT}/lib/I18n/I18nStrings.h
@@ -308,17 +313,18 @@ else()
     set(I18N_GEN_ARGS ${REPO_ROOT}/lib/I18n/translations ${REPO_ROOT}/lib/I18n)
     set(I18N_GEN_COMMENT "Generating I18n strings")
 endif()
-add_custom_command(
-    OUTPUT ${I18N_GENERATED}
+set_source_files_properties(${I18N_GENERATED} PROPERTIES GENERATED TRUE)
+add_custom_target(i18n_generated
     COMMAND "${I18N_PYTHON}" ${REPO_ROOT}/scripts/gen_i18n.py ${I18N_GEN_ARGS}
+    BYPRODUCTS ${I18N_GENERATED}
     DEPENDS ${REPO_ROOT}/scripts/gen_i18n.py ${I18N_TRANSLATIONS}
     COMMENT ${I18N_GEN_COMMENT}
 )
-add_custom_target(i18n_generated DEPENDS ${I18N_GENERATED})
 
 # WeRead is Chinese-SKU only (mirrors PlatformIO build_src_filter). Exclude
-# before add_executable so JA/KO builds don't reference gated ActivityManager APIs.
-if(SIMULATOR_JAPANESE_VERSION OR SIMULATOR_KOREAN_VERSION)
+# before add_executable so international/JA/KO builds don't reference gated
+# ActivityManager APIs.
+if(SIMULATOR_INTERNATIONAL_VERSION OR SIMULATOR_JAPANESE_VERSION OR SIMULATOR_KOREAN_VERSION)
     list(FILTER CROSSPOINT_SRC EXCLUDE REGEX "activities/apps/weread/")
 endif()
 
@@ -399,6 +405,7 @@ target_include_directories(crosspoint_simulator PRIVATE
 
 # Rename Arduino entry points so the simulator entry can drive them explicitly.
 # Default SKU is Traditional Chinese (CJK fonts + WeRead/农历/CJK typography).
+# SIMULATOR_INTERNATIONAL_VERSION selects the non-CJK international firmware.
 # SIMULATOR_JAPANESE_VERSION / SIMULATOR_KOREAN_VERSION switch to those firmwares.
 # SIMULATOR_CHINESE_UI_SIMPLIFIED mirrors PlatformIO's CHINESE_UI_SIMPLIFIED (SC SKU).
 target_compile_definitions(crosspoint_simulator PRIVATE
@@ -413,7 +420,9 @@ target_compile_definitions(crosspoint_simulator PRIVATE
     "setup=firmware_setup"
     "loop=firmware_loop"
 )
-if(SIMULATOR_JAPANESE_VERSION)
+if(SIMULATOR_INTERNATIONAL_VERSION)
+    # International SKU intentionally has no ENABLE_*_VERSION or ENABLE_CJK_VERSION definition.
+elseif(SIMULATOR_JAPANESE_VERSION)
     target_compile_definitions(crosspoint_simulator PRIVATE
         ENABLE_JAPANESE_VERSION=1
         ENABLE_CJK_VERSION=1)

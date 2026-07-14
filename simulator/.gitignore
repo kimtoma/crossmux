@@ -1,4 +1,6 @@
 build/
+build_intl/
+build_tc/
 build_sc/
 build_ja/
 build_ko/
