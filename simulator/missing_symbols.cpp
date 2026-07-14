@@ -176,7 +176,16 @@ void selfTest() {}
   void Cls::render(RenderLock&&) {}
 
 #include "activities/network/WifiSelectionActivity.h"
-STUB_ACTIVITY_BASE(WifiSelectionActivity)
+// Simulator has no Wi-Fi UI; immediately succeed so callers (OPDS / KOSync /
+// ClockSync) continue on the host network stack instead of hanging on a blank stub.
+void WifiSelectionActivity::onEnter() {
+  Activity::onEnter();
+  result.isCancelled = false;
+  finish();
+}
+void WifiSelectionActivity::onExit() {}
+void WifiSelectionActivity::loop() {}
+void WifiSelectionActivity::render(RenderLock&&) {}
 
 #include "activities/network/CrossPointWebServerActivity.h"
 STUB_ACTIVITY_BASE(CrossPointWebServerActivity)
