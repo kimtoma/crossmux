@@ -20,6 +20,7 @@
 #include "SilentRestart.h"
 #include "activities/ActivityManager.h"
 #include "activities/network/WifiSelectionActivity.h"
+#include "activities/settings/KOReaderSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -84,6 +85,31 @@ void KOReaderSyncActivity::saveProgressAndReturn(int spineIndex, int page) {
 }
 
 void KOReaderSyncActivity::returnToReader() { activityManager.goToReader(epubPath); }
+
+void KOReaderSyncActivity::openLoginSettings() {
+  startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), [this](
+                                                                                                const ActivityResult&) {
+    if (!KOREADER_STORE.hasCredentials()) {
+      // Still unauthenticated — refresh the hint screen.
+      {
+        RenderLock lock(*this);
+        state = NO_CREDENTIALS;
+        authFailure = false;
+      }
+      requestUpdate();
+      return;
+    }
+
+    // Credentials saved: continue the normal sync path.
+    wifiActivated = true;
+    if (WiFi.status() == WL_CONNECTED) {
+      onWifiSelectionComplete(true);
+    } else {
+      startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+                             [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
+    }
+  });
+}
 
 void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
@@ -294,7 +320,7 @@ void KOReaderSyncActivity::render(RenderLock&&) {
     UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top + 40, tr(STR_LOGIN_SETTINGS_HINT));
     UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top + 70, tr(STR_RYOS_ACCOUNT_HINT));
 
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SETTINGS_TITLE), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();
     return;
@@ -395,21 +421,31 @@ void KOReaderSyncActivity::render(RenderLock&&) {
       UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top, tr(STR_AUTH_FAILED), true, EpdFontFamily::BOLD);
       UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top + 40, tr(STR_LOGIN_SETTINGS_HINT));
       UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top + 70, tr(STR_RYOS_ACCOUNT_HINT));
+      const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SETTINGS_TITLE), "", "");
+      GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     } else {
       UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top, tr(STR_SYNC_FAILED_MSG), true,
                                 EpdFontFamily::BOLD);
       UITheme::drawCenteredText(renderer, screen, UI_10_FONT_ID, top + 40, statusMessage.c_str());
+      const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+      GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     }
-
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();
     return;
   }
 }
 
 void KOReaderSyncActivity::loop() {
-  if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
+  if (state == NO_CREDENTIALS || (state == SYNC_FAILED && authFailure)) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      returnToReader();
+    } else if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      openLoginSettings();
+    }
+    return;
+  }
+
+  if (state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       returnToReader();
     }

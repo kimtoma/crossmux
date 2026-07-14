@@ -88,6 +88,7 @@ class KOReaderSyncActivity final : public Activity {
   bool authFailure = false;
 
   void onWifiSelectionComplete(bool success);
+  void openLoginSettings();
   void performSync();
   void performUpload();
   void ensureEpubLoaded();
