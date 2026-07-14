@@ -176,16 +176,22 @@ void selfTest() {}
   void Cls::render(RenderLock&&) {}
 
 #include "activities/network/WifiSelectionActivity.h"
-STUB_ACTIVITY_BASE(WifiSelectionActivity)
+// Simulator has no Wi-Fi UI; immediately succeed so callers (OPDS / KOSync /
+// ClockSync) continue on the host network stack instead of hanging on a blank stub.
+void WifiSelectionActivity::onEnter() {
+  Activity::onEnter();
+  result.isCancelled = false;
+  finish();
+}
+void WifiSelectionActivity::onExit() {}
+void WifiSelectionActivity::loop() {}
+void WifiSelectionActivity::render(RenderLock&&) {}
 
 #include "activities/network/CrossPointWebServerActivity.h"
 STUB_ACTIVITY_BASE(CrossPointWebServerActivity)
 
 #include "activities/network/CalibreConnectActivity.h"
 STUB_ACTIVITY_BASE(CalibreConnectActivity)
-
-#include "activities/browser/OpdsBookBrowserActivity.h"
-STUB_ACTIVITY_BASE(OpdsBookBrowserActivity)
 
 #include "activities/settings/OtaUpdateActivity.h"
 STUB_ACTIVITY_BASE(OtaUpdateActivity)
@@ -210,8 +216,17 @@ STUB_ACTIVITY_BASE(FontDownloadActivity)
 #include "activities/settings/KOReaderAuthActivity.h"
 STUB_ACTIVITY_BASE(KOReaderAuthActivity)
 
-#include "activities/reader/KOReaderSyncActivity.h"
-STUB_ACTIVITY_BASE(KOReaderSyncActivity)
+// Real KOReaderSyncActivity is linked (credentials hint UI), but the HTTP client
+// needs a fuller esp_http_client shim than the simulator carries. Stub the
+// network methods; NO_CREDENTIALS never calls them.
+#include "KOReaderSyncClient.h"
+int KOReaderSyncClient::lastHttpCode = 0;
+KOReaderSyncClient::Error KOReaderSyncClient::authenticate() { return NO_CREDENTIALS; }
+KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string&, KOReaderProgress&) {
+  return NO_CREDENTIALS;
+}
+KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgress&) { return NO_CREDENTIALS; }
+const char* KOReaderSyncClient::errorString(Error) { return "No credentials configured"; }
 
 // CrossPointWebServer destructor referenced from CrossPointWebServerActivity vtable.
 #include "network/CrossPointWebServer.h"
