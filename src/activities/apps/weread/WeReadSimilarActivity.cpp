@@ -15,7 +15,13 @@ WeReadSimilarActivity::WeReadSimilarActivity(GfxRenderer& renderer, MappedInputM
       bookId_(std::move(bookId)),
       bookTitle_(std::move(bookTitle)) {}
 
-void WeReadSimilarActivity::buildRequest(JsonDocument& body) { body["bookId"] = bookId_; }
+void WeReadSimilarActivity::buildRequest(JsonDocument& body) {
+  body["bookId"] = bookId_;
+  // skill v1.0.4: count and maxIdx are required — omitting them breaks the
+  // underlying /book/detailinfo listTypes length check.
+  body["count"] = 12;
+  body["maxIdx"] = 0;
+}
 
 void WeReadSimilarActivity::buildResponseFilter(JsonDocument& filter) {
   filter["booksimilar"]["books"][0]["idx"] = true;
@@ -62,7 +68,9 @@ void WeReadSimilarActivity::renderContent(Rect contentRect) {
         const auto& r = rows_[i];
         // newRating is 0..100 → /10 with one decimal.
         if (r.newRating > 0) {
-          std::snprintf(subtitleBuf, sizeof(subtitleBuf), "%s · 評分 %.1f", r.author.c_str(), r.newRating / 10.0);
+          char ratingBuf[24];
+          std::snprintf(ratingBuf, sizeof(ratingBuf), tr(STR_WEREAD_RATING_FMT), r.newRating / 10.0);
+          std::snprintf(subtitleBuf, sizeof(subtitleBuf), "%s · %s", r.author.c_str(), ratingBuf);
         } else {
           std::snprintf(subtitleBuf, sizeof(subtitleBuf), "%s", r.author.c_str());
         }
