@@ -208,7 +208,7 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
       state = BrowserState::ERROR;
       if (fetchResult == HttpDownloader::AUTH_FAILED) {
         const bool missingCreds = server.username.empty() || server.password.empty();
-        errorMessage = tr(missingCreds ? STR_NO_CREDENTIALS_MSG : STR_AUTH_FAILED);
+        errorMessage = missingCreds ? tr(STR_NO_CREDENTIALS_MSG) : tr(STR_AUTH_FAILED);
         errorHint = tr(STR_LOGIN_SETTINGS_HINT);
       } else {
         errorMessage = tr(STR_FETCH_FEED_FAILED);
@@ -306,7 +306,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
     state = BrowserState::ERROR;
     if (result == HttpDownloader::AUTH_FAILED) {
       const bool missingCreds = server.username.empty() || server.password.empty();
-      errorMessage = tr(missingCreds ? STR_NO_CREDENTIALS_MSG : STR_AUTH_FAILED);
+      errorMessage = missingCreds ? tr(STR_NO_CREDENTIALS_MSG) : tr(STR_AUTH_FAILED);
       errorHint = tr(STR_LOGIN_SETTINGS_HINT);
     } else {
       errorMessage = tr(STR_DOWNLOAD_FAILED);
