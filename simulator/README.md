@@ -226,15 +226,19 @@ Save as `simulator/sd_root/.crosspoint/state.json` before launching.
 
 ## What's out of scope (first version)
 
-- WiFi config UI / OPDS / KOReader sync / Calibre / file transfer / OTA / web server
+- WiFi config UI / Calibre / file transfer / OTA / web server
 - Image rendering inside EPUBs (PNG/JPEG decoders are stubbed)
 - 4-level grayscale (grayscale buffers fall through to 1-bpp — e.g. the AirPage
   image renders in plain B&W in the sim, though the BW frame still displays)
 - Real e-ink refresh timing / ghosting
 
-Activities for those features still build (we provide empty out-of-line stubs in
-`missing_symbols.cpp`) but the underlying functionality returns failure if the
-user navigates into them.
+**Partially enabled:** ryOS Books (OPDS browser) uses real `HttpDownloader` over
+libcurl, so missing/wrong credentials against `os.ryo.lu` show the auth-error
+UI. ryOS Cloud Sync links the real credentials-hint activity; the KOSync HTTP
+client is still stubbed (network sync itself is not exercised on host).
+
+Other excluded activities still build via empty out-of-line stubs in
+`missing_symbols.cpp` but show an empty screen if navigated into.
 
 ## Architectural compromises (worth knowing)
 
