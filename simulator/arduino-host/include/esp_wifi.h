@@ -4,3 +4,4 @@
 // esp_wifi_deinit() defensively before light sleep on real hardware.
 
 inline int esp_wifi_deinit() { return 0; }
+inline int esp_wifi_stop() { return 0; }

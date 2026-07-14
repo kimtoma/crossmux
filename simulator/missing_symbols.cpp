@@ -184,9 +184,6 @@ STUB_ACTIVITY_BASE(CrossPointWebServerActivity)
 #include "activities/network/CalibreConnectActivity.h"
 STUB_ACTIVITY_BASE(CalibreConnectActivity)
 
-#include "activities/browser/OpdsBookBrowserActivity.h"
-STUB_ACTIVITY_BASE(OpdsBookBrowserActivity)
-
 #include "activities/settings/OtaUpdateActivity.h"
 STUB_ACTIVITY_BASE(OtaUpdateActivity)
 
@@ -210,8 +207,17 @@ STUB_ACTIVITY_BASE(FontDownloadActivity)
 #include "activities/settings/KOReaderAuthActivity.h"
 STUB_ACTIVITY_BASE(KOReaderAuthActivity)
 
-#include "activities/reader/KOReaderSyncActivity.h"
-STUB_ACTIVITY_BASE(KOReaderSyncActivity)
+// Real KOReaderSyncActivity is linked (credentials hint UI), but the HTTP client
+// needs a fuller esp_http_client shim than the simulator carries. Stub the
+// network methods; NO_CREDENTIALS never calls them.
+#include "KOReaderSyncClient.h"
+int KOReaderSyncClient::lastHttpCode = 0;
+KOReaderSyncClient::Error KOReaderSyncClient::authenticate() { return NO_CREDENTIALS; }
+KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string&, KOReaderProgress&) {
+  return NO_CREDENTIALS;
+}
+KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgress&) { return NO_CREDENTIALS; }
+const char* KOReaderSyncClient::errorString(Error) { return "No credentials configured"; }
 
 // CrossPointWebServer destructor referenced from CrossPointWebServerActivity vtable.
 #include "network/CrossPointWebServer.h"
