@@ -21,6 +21,12 @@ wrap in `TxtReaderActivity`). The Japanese SKU
 additionally treats small kana and `ー` as line-start prohibited (JLReq / CSS
 normal for long-form reading).
 
+Japanese builds also apply 約物詰め (punctuation compression) via
+[`CjkPunctCompression.h`](../../lib/Epub/Epub/CjkPunctCompression.h) when Reader
+setting `punctCompressionEnabled` is on (default). Korean builds ignore
+compression. Section cache version for JA is 72; see
+[file-formats.md](../file-formats.md).
+
 ## Character coverage
 
 ### Japanese (official lists)

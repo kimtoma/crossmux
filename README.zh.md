@@ -19,10 +19,11 @@
 在閱讀設定或書內選單選擇 `排版方向 > 豎排（右起）`。版面引擎會：
 
 - 由右至左排欄
-- 使用直排標點呈現形
+- 使用直排標點呈現形；繁體依 CLREQ／台灣慣例保留正立置中的點號（`、。，：；！？`），簡體則採日文風格的 FE 區對應
 - 將重複省略號、破折號逐字堆疊
 - 旋轉拉丁文段落，並保持短數字參考可讀
-- 對緊湊橫向片段套用縱中橫
+- 對緊湊橫向片段套用縱中橫（單獨字母／數字擴成全形；兩字片段維持半形）
+- 在閱讀設定啟用時，對繁體／簡體／日文套用標點擠壓／約物詰め（預設開啟；韓文／拉丁固件不套用）
 - 讓段落間距與區塊邊距沿欄軸方向作用
 - 依閱讀方向反轉翻頁控制
 
@@ -57,7 +58,7 @@
 
 `.cpfont` 字族可放在 SD 卡的 `/.fonts/` 或 `/fonts/`。載入器會按需索引大型 CJK 字族、預熱即將用到的頁面字形，並在缺少粗體／斜體字形時回退到 Regular。
 
-倉庫亦包含 EB Garamond + 各地區 Source Han Serif 建置腳本（`EBGaramondSHS-{TC,SC,JA,KO}`）。詳見 [SD-card fonts](./docs/sd-card-fonts.md)。
+倉庫亦包含 EB Garamond + 各地區 Source Han Serif 建置腳本（字族 `EBGaramondSHS-{TC,SC,JA,KO}`，來源位於 `lib/EpdFont/scripts/source_fonts/`）。詳見 [SD-card fonts](./docs/sd-card-fonts.md)。
 
 ### 更快的灰階文字
 
@@ -97,6 +98,7 @@ ryOS CrossMux 保留上游 CrossPoint 的主要閱讀能力：
 - EPUB 2／3 渲染
 - 章節導覽、腳註、書籤、跳轉百分比
 - 內嵌樣式、圖片、字距、連字符、專注閱讀
+- CJK 直排、禁則斷行／斷欄，以及繁體／簡體／日文的標點擠壓／約物詰め
 - 自動翻頁、方向控制、螢幕截圖、QR 顯示
 - 以 ryOS 帳號進行 ryOS 雲端同步（相容 KOReader）
 - `.epub`／`.txt`／`.xtc`／`.xtch`／`.bmp`

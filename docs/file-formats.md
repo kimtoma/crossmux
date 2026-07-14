@@ -132,7 +132,9 @@ if (parsedSize != fileSize) {
 >
 > CJK versions 70/71/72 add 標點擠壓 (punctuation compression) for TC/SC/JA:
 > adjacent half-em advance trims and line/column-edge trims (TC skips PauseStop
-> adjacent and line-end PauseStop per CLREQ 繁體不適用). Compression runs before
+> adjacent and line-end PauseStop per CLREQ 繁體不適用). Line/column-start open
+> brackets hang by glyph left bearing (full advance kept) so ink clears the
+> content edge without overlapping the next glyph. Compression runs before
 > kinsoku repair; edge trims apply on the final run bounds. Gated by Reader
 > setting `punctCompressionEnabled` (default on). Korean and Latin SKUs ignore
 > compression. Helpers live in `lib/Epub/Epub/CjkPunctCompression.h`.

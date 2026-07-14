@@ -129,6 +129,8 @@ ryOS CrossMux keeps the main CrossPoint reader:
 - EPUB 2 and EPUB 3 rendering
 - chapter navigation, footnotes, bookmarks, and go-to-percent
 - embedded styles, images, kerning, hyphenation, and focus reading
+- CJK vertical-rl layout, 禁則 (kinsoku) line/column breaks, and 標點擠壓 /
+  約物詰め (punctuation compression) on TC/SC/JA
 - auto page turn, orientation control, screenshots, and QR display
 - ryOS Cloud Sync with your ryOS Account (KOReader-compatible)
 - `.epub`, `.txt`, `.xtc`, `.xtch`, and `.bmp` files
