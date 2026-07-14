@@ -27,8 +27,9 @@ TEST(CjkPunctCompression, AdjacentTcSkipsPauseStopPairs) {
   EXPECT_EQ(CjkPunctCompression::adjacentTrimPx(Class::PauseStop, Class::OpenBracket, Profile::TraditionalChinese, em),
             0);
   // TC: 「『 still compressed
-  EXPECT_EQ(CjkPunctCompression::adjacentTrimPx(Class::OpenBracket, Class::OpenBracket, Profile::TraditionalChinese, em),
-            em / 2);
+  EXPECT_EQ(
+      CjkPunctCompression::adjacentTrimPx(Class::OpenBracket, Class::OpenBracket, Profile::TraditionalChinese, em),
+      em / 2);
   EXPECT_EQ(
       CjkPunctCompression::adjacentTrimPx(Class::CloseBracket, Class::OpenBracket, Profile::TraditionalChinese, em),
       em / 2);
@@ -99,8 +100,8 @@ TEST(CjkPunctCompression, EdgeTrimAfterKinsokuBounds) {
 
 // Kinsoku still refuses a break before 。 even when compression would tighten the pair.
 TEST(CjkPunctCompression, KinsokuStillBlocksBreakBeforeCompressedStop) {
-  EXPECT_FALSE(CjkKinsoku::isLegalBreakBetween(0x4E2D, 0x3002));                         // 中。
-  EXPECT_FALSE(CjkKinsoku::isLegalBreakBetween(0x3002, 0x300D));                         // 。」
+  EXPECT_FALSE(CjkKinsoku::isLegalBreakBetween(0x4E2D, 0x3002));  // 中。
+  EXPECT_FALSE(CjkKinsoku::isLegalBreakBetween(0x3002, 0x300D));  // 。」
   EXPECT_TRUE(CjkKinsoku::isLineStartProhibited(0x3002));
   std::vector<std::string> words = {"\xe4\xb8\xad", "\xe3\x80\x82", "\xe3\x80\x8d"};  // 中。」
   std::vector<bool> continues = {false, false, false};

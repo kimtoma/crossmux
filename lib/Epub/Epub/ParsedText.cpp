@@ -795,8 +795,8 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
 
   const int pageWidth = viewportWidth;
   auto wordWidths = calculateWordWidths(renderer, fontId);
-  const auto punctProfile = punctCompressionEnabled ? CjkPunctCompression::currentProfile()
-                                                    : CjkPunctCompression::Profile::Off;
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
   if (punctProfile != CjkPunctCompression::Profile::Off) {
     const int emPx = verticalCellStep(renderer, fontId);
     CjkPunctCompression::applyAdjacentPunctCompression(words, wordContinues, wordWidths, emPx, punctProfile);
@@ -893,8 +893,8 @@ void ParsedText::extractVerticalColumn(const size_t startIdx, const size_t endId
     extents.push_back(verticalExtents[i]);
   }
 
-  const auto punctProfile = punctCompressionEnabled ? CjkPunctCompression::currentProfile()
-                                                    : CjkPunctCompression::Profile::Off;
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
   int startPaintShift = 0;
   if (punctProfile != CjkPunctCompression::Profile::Off && !extents.empty()) {
     const int emPx = verticalCellStep(renderer, fontId);
@@ -950,8 +950,8 @@ void ParsedText::layoutAndExtractVerticalColumns(const GfxRenderer& renderer, co
     verticalExtents.push_back(static_cast<uint16_t>(verticalExtentForWord(
         renderer, fontId, words[i], wordStyles[i], cellStep, wordWidths[i], isSidewaysVerticalWordAt(words, i))));
   }
-  const auto punctProfile = punctCompressionEnabled ? CjkPunctCompression::currentProfile()
-                                                    : CjkPunctCompression::Profile::Off;
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
   if (punctProfile != CjkPunctCompression::Profile::Off) {
     CjkPunctCompression::applyAdjacentPunctCompression(words, wordContinues, verticalExtents, cellStep, punctProfile);
   }
@@ -1317,8 +1317,8 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     lineAdvances.push_back(wordWidths[lastBreakAt + i]);
   }
   int lineStartPaintShift = 0;
-  const auto punctProfile = punctCompressionEnabled ? CjkPunctCompression::currentProfile()
-                                                    : CjkPunctCompression::Profile::Off;
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
   if (punctProfile != CjkPunctCompression::Profile::Off && lineWordCount > 0) {
     const int emPx = verticalCellStep(renderer, fontId);
     const auto edge = CjkPunctCompression::lineEdgeTrimPx(lineWords, 0, lineWordCount, punctProfile, emPx);

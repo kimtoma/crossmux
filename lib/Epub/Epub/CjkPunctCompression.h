@@ -1,11 +1,11 @@
 #pragma once
 
-#include "CjkKinsoku.h"
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "CjkKinsoku.h"
 
 // CJK punctuation compression (標點擠壓 / 約物詰め).
 // Shrinks layout advances between adjacent punctuation and at line/column
@@ -159,9 +159,7 @@ inline Class classify(const uint32_t cp) {
   }
 }
 
-inline bool involvesPauseStop(const Class a, const Class b) {
-  return a == Class::PauseStop || b == Class::PauseStop;
-}
+inline bool involvesPauseStop(const Class a, const Class b) { return a == Class::PauseStop || b == Class::PauseStop; }
 
 // Adjacent pair trim in pixels (0 if no compression). Typically half-em; middle-dot
 // pairs use quarter-em. Ellipsis/dash inseparable pairs are never compressed.
