@@ -1,6 +1,7 @@
 #include "ParsedText.h"
 
 #include <BidiUtils.h>
+#include <EpdFontData.h>
 #include <GfxRenderer.h>
 #include <Utf8.h>
 
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "CjkKinsoku.h"
+#include "CjkPunctCompression.h"
 #include "VerticalPunctuation.h"
 #include "hyphenation/Hyphenator.h"
 
@@ -27,6 +29,31 @@ constexpr size_t RTL_PARAGRAPH_PROBE_WORDS = 3;
 // before giving up. 64 is a hedge for pathological cases like long numeric tokens.
 constexpr int RTL_PER_WORD_PROBE_DEPTH = 64;
 constexpr size_t MIN_JUSTIFY_GAPS = 1;
+
+// Line/column-start openers (「（《…) put their blank on the leading side: large
+// positive glyph.left, ink on the trailing half of the em cell. Hang by that
+// left bearing (not merely em/2) and keep a full advance so the next glyph
+// starts at paint+advance ≈ content_edge + ink_width. Shrinking advance — with
+// or without a half-em shift — parks the next cursor inside the opener's ink.
+int openBracketStartHangPx(const GfxRenderer& renderer, const int fontId, const std::string& word,
+                           const EpdFontFamily::Style style, const int fallbackTrimPx) {
+  if (fallbackTrimPx <= 0) return 0;
+  const uint32_t cp = CjkKinsoku::firstCodepoint(word);
+  if (CjkPunctCompression::classify(cp) != CjkPunctCompression::Class::OpenBracket) {
+    return fallbackTrimPx;
+  }
+  const auto& fontMap = renderer.getFontMap();
+  const auto it = fontMap.find(fontId);
+  if (it == fontMap.end()) return fallbackTrimPx;
+  const EpdGlyph* glyph = it->second.getGlyph(cp, style);
+  if (!glyph || glyph->left <= 0) {
+    // Advance-table layout often lacks side bearings; fullwidth openers typically
+    // keep ~2/3 em as leading blank (EBGaramondSHS 「 is left≈19 of advance≈29).
+    return std::max(fallbackTrimPx, (fallbackTrimPx * 4 + 2) / 3);
+  }
+  // Prefer the real leading blank; never hang less than the CLREQ half-em trim.
+  return std::max(fallbackTrimPx, static_cast<int>(glyph->left));
+}
 constexpr int VERTICAL_SIDEWAYS_EDGE_GAP = 2;
 
 // Vertical-rl: upright CJK/Hangul cells; short ASCII runs use 縦中横; longer
@@ -794,6 +821,12 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
 
   const int pageWidth = viewportWidth;
   auto wordWidths = calculateWordWidths(renderer, fontId);
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
+  if (punctProfile != CjkPunctCompression::Profile::Off) {
+    const int emPx = verticalCellStep(renderer, fontId);
+    CjkPunctCompression::applyAdjacentPunctCompression(words, wordContinues, wordWidths, emPx, punctProfile);
+  }
 
   std::vector<size_t> lineBreakIndices;
   if (hyphenationEnabled) {
@@ -823,11 +856,10 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
 
 std::vector<size_t> ParsedText::computeVerticalColumnBreaks(const GfxRenderer& renderer, const int fontId,
                                                             const int columnHeight,
-                                                            const std::vector<uint16_t>& wordWidths) {
+                                                            const std::vector<uint16_t>& verticalExtents) {
   if (words.empty()) {
     return {};
   }
-  const int cellStep = verticalCellStep(renderer, fontId);
   std::vector<size_t> columnBreakIndices;
   size_t i = 0;
   const size_t total = words.size();
@@ -836,8 +868,7 @@ std::vector<size_t> ParsedText::computeVerticalColumnBreaks(const GfxRenderer& r
     size_t j = i;
     while (j < total) {
       const int gap = verticalGapBeforeWord(renderer, fontId, words, wordStyles, wordContinues, wordNoSpaceBefore, j);
-      const int extent = verticalExtentForWord(renderer, fontId, words[j], wordStyles[j], cellStep, wordWidths[j],
-                                               isSidewaysVerticalWordAt(words, j));
+      const int extent = static_cast<int>(verticalExtents[j]);
       if (y + gap + extent > columnHeight && j > i) {
         break;
       }
@@ -866,8 +897,8 @@ std::vector<size_t> ParsedText::computeVerticalColumnBreaks(const GfxRenderer& r
 }
 
 void ParsedText::extractVerticalColumn(const size_t startIdx, const size_t endIdx,
-                                       const std::vector<uint16_t>& wordWidths, const GfxRenderer& renderer,
-                                       const int fontId, const int cellStep,
+                                       const std::vector<uint16_t>& verticalExtents, const GfxRenderer& renderer,
+                                       const int fontId,
                                        const std::function<void(std::shared_ptr<TextBlock>)>& processLine) {
   const size_t columnWordCount = endIdx - startIdx;
   if (columnWordCount == 0) {
@@ -877,18 +908,41 @@ void ParsedText::extractVerticalColumn(const size_t startIdx, const size_t endId
   std::vector<std::string> columnWords;
   std::vector<EpdFontFamily::Style> columnStyles;
   std::vector<int16_t> columnYPos;
+  std::vector<uint16_t> extents;
   columnWords.reserve(columnWordCount);
   columnStyles.reserve(columnWordCount);
   columnYPos.reserve(columnWordCount);
-
-  int ypos = 0;
+  extents.reserve(columnWordCount);
   for (size_t i = startIdx; i < endIdx; ++i) {
-    ypos += verticalGapBeforeWord(renderer, fontId, words, wordStyles, wordContinues, wordNoSpaceBefore, i);
     columnWords.push_back(words[i]);
     columnStyles.push_back(wordStyles[i]);
+    extents.push_back(verticalExtents[i]);
+  }
+
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
+  // Line/column-start openers hang their leading blank into the margin (paint
+  // shift from glyph.left, at least half-em) and keep a full advance so the next
+  // glyph clears the opener's trailing ink. End-edge marks still trim advance.
+  int startPaintShift = 0;
+  if (punctProfile != CjkPunctCompression::Profile::Off && !extents.empty()) {
+    const int emPx = verticalCellStep(renderer, fontId);
+    const auto edge = CjkPunctCompression::lineEdgeTrimPx(columnWords, 0, columnWords.size(), punctProfile, emPx);
+    if (edge.startTrim > 0) {
+      startPaintShift =
+          -openBracketStartHangPx(renderer, fontId, columnWords.front(), columnStyles.front(), edge.startTrim);
+    }
+    if (edge.endTrim > 0) {
+      extents.back() = CjkPunctCompression::clampAdvanceAfterTrim(extents.back(), edge.endTrim, emPx);
+    }
+  }
+
+  int ypos = startPaintShift;
+  for (size_t i = 0; i < columnWordCount; ++i) {
+    const size_t src = startIdx + i;
+    ypos += verticalGapBeforeWord(renderer, fontId, words, wordStyles, wordContinues, wordNoSpaceBefore, src);
     columnYPos.push_back(static_cast<int16_t>(ypos));
-    ypos += verticalExtentForWord(renderer, fontId, words[i], wordStyles[i], cellStep, wordWidths[i],
-                                  isSidewaysVerticalWordAt(words, i));
+    ypos += static_cast<int>(extents[i]);
   }
 
   processLine(std::make_shared<TextBlock>(std::move(columnWords), std::move(columnYPos), std::move(columnStyles),
@@ -916,14 +970,25 @@ void ParsedText::layoutAndExtractVerticalColumns(const GfxRenderer& renderer, co
 
   const int cellStep = verticalCellStep(renderer, fontId);
   auto wordWidths = calculateWordWidths(renderer, fontId);
-  auto columnBreakIndices = computeVerticalColumnBreaks(renderer, fontId, columnHeight, wordWidths);
+  std::vector<uint16_t> verticalExtents;
+  verticalExtents.reserve(words.size());
+  for (size_t i = 0; i < words.size(); ++i) {
+    verticalExtents.push_back(static_cast<uint16_t>(verticalExtentForWord(
+        renderer, fontId, words[i], wordStyles[i], cellStep, wordWidths[i], isSidewaysVerticalWordAt(words, i))));
+  }
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
+  if (punctProfile != CjkPunctCompression::Profile::Off) {
+    CjkPunctCompression::applyAdjacentPunctCompression(words, wordContinues, verticalExtents, cellStep, punctProfile);
+  }
+  auto columnBreakIndices = computeVerticalColumnBreaks(renderer, fontId, columnHeight, verticalExtents);
   const size_t columnCount =
       includeLastLine ? columnBreakIndices.size() : (columnBreakIndices.empty() ? 0 : columnBreakIndices.size() - 1);
 
   size_t startIdx = 0;
   for (size_t col = 0; col < columnCount; ++col) {
     const size_t endIdx = columnBreakIndices[col];
-    extractVerticalColumn(startIdx, endIdx, wordWidths, renderer, fontId, cellStep, processLine);
+    extractVerticalColumn(startIdx, endIdx, verticalExtents, renderer, fontId, processLine);
     startIdx = endIdx;
   }
 
@@ -1270,6 +1335,30 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     lineWordStyles.push_back(wordStyles[lastBreakAt + i]);
   }
 
+  // Per-line advances: copy compressed paragraph widths, then apply line-edge
+  // trims after kinsoku has finalized this break (start/end of the run only).
+  // Open-bracket start: hang by glyph.left (leading blank) and keep full advance.
+  // End marks trim advance only.
+  std::vector<uint16_t> lineAdvances;
+  lineAdvances.reserve(lineWordCount);
+  for (size_t i = 0; i < lineWordCount; ++i) {
+    lineAdvances.push_back(wordWidths[lastBreakAt + i]);
+  }
+  int lineStartPaintShift = 0;
+  const auto punctProfile =
+      punctCompressionEnabled ? CjkPunctCompression::currentProfile() : CjkPunctCompression::Profile::Off;
+  if (punctProfile != CjkPunctCompression::Profile::Off && lineWordCount > 0) {
+    const int emPx = verticalCellStep(renderer, fontId);
+    const auto edge = CjkPunctCompression::lineEdgeTrimPx(lineWords, 0, lineWordCount, punctProfile, emPx);
+    if (edge.startTrim > 0) {
+      lineStartPaintShift =
+          -openBracketStartHangPx(renderer, fontId, lineWords.front(), lineWordStyles.front(), edge.startTrim);
+    }
+    if (edge.endTrim > 0) {
+      lineAdvances.back() = CjkPunctCompression::clampAdvanceAfterTrim(lineAdvances.back(), edge.endTrim, emPx);
+    }
+  }
+
   // Calculate total word width for this line, count actual word gaps,
   // and accumulate total natural gap widths (including space kerning adjustments).
   int lineWordWidthSum = 0;
@@ -1277,7 +1366,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
   int totalNaturalGaps = 0;
 
   for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
-    lineWordWidthSum += wordWidths[lastBreakAt + wordIdx];
+    lineWordWidthSum += lineAdvances[wordIdx];
     // Count gaps: each word after the first creates a gap, unless it's a continuation
     if (wordIdx > 0 && noSpaceBeforeVec[lastBreakAt + wordIdx]) {
       // Unicode break opportunity with no inserted Latin-style space. It is still
@@ -1345,7 +1434,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       const uint16_t src = visualOrderScratch[i];
       reorderedWordsScratch.push_back(std::move(lineWords[src]));
       reorderedStylesScratch.push_back(lineWordStyles[src]);
-      reorderedWidthsScratch.push_back(wordWidths[lastBreakAt + src]);
+      reorderedWidthsScratch.push_back(lineAdvances[src]);
       reorderedFocusSuffixScratch.push_back(wordIsFocusSuffix[lastBreakAt + src]);
 
       // Continuation means "no break/gap between two adjacent logical tokens".
@@ -1410,11 +1499,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
         xpos = (effectivePageWidth - contentWidth) / 2;
       }
     } else {
-      xpos = firstLineIndent;
+      xpos = firstLineIndent + lineStartPaintShift;
       if (effectiveAlignment == CssTextAlign::Right) {
-        xpos = effectivePageWidth - contentWidth;
+        xpos = effectivePageWidth - contentWidth + lineStartPaintShift;
       } else if (effectiveAlignment == CssTextAlign::Center) {
-        xpos = (effectivePageWidth - contentWidth) / 2;
+        xpos = (effectivePageWidth - contentWidth) / 2 + lineStartPaintShift;
       }
     }
 
@@ -1465,7 +1554,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       // For Right and Justify, start from right edge (xpos = effectivePageWidth)
 
       for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
-        xpos -= wordWidths[lastBreakAt + wordIdx];
+        xpos -= lineAdvances[wordIdx];
         lineXPos.push_back(static_cast<int16_t>(xpos));
 
         const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
@@ -1497,11 +1586,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       }
     } else {
       // LTR: position words from left to right
-      int xpos = firstLineIndent;
+      int xpos = firstLineIndent + lineStartPaintShift;
       if (effectiveAlignment == CssTextAlign::Right) {
-        xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
+        xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + lineStartPaintShift;
       } else if (effectiveAlignment == CssTextAlign::Center) {
-        xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2;
+        xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2 + lineStartPaintShift;
       }
 
       for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
@@ -1509,7 +1598,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
 
         const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
         if (nextIsContinuation) {
-          int advance = wordWidths[lastBreakAt + wordIdx];
+          int advance = lineAdvances[wordIdx];
           advance += renderer.getKerning(fontId, lastCodepoint(lineWords[wordIdx]),
                                          firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
           // wordIdx > 0 mirrors the gap accounting above (which skips index 0): a leading
@@ -1533,7 +1622,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;
           }
-          xpos += wordWidths[lastBreakAt + wordIdx] + gap;
+          xpos += lineAdvances[wordIdx] + gap;
         }
       }
     }
