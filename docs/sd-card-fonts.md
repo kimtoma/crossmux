@@ -131,27 +131,42 @@ Full-range `--intervals cjk` on a complete CJK OTF can produce **15–30 MB** pe
 - Extended symbol blocks for EPUB (arrows, box drawing, dingbats, etc.)
 - Traditional glyphs only; firmware remaps Simplified codepoints at runtime via `ScToTcRemap.h`
 
-**EB Garamond + Source Han Serif TC** (Latin from EB Garamond, CJK from weight-matched SHS TC fallbacks):
+**EB Garamond + Source Han Serif** (Latin from EB Garamond, CJK from
+weight-matched regional Source Han Serif fallbacks):
 
 ```bash
-pip install freetype-py fonttools OpenCC
+pip install freetype-py fonttools
 
-# Defaults: ~/Downloads/EB_Garamond/static and
-# ~/Downloads/10_SourceHanSerifTC/OTF/TraditionalChinese
-bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh
+# Sources default to lib/EpdFont/scripts/source_fonts/
+#   EBGaramond/, SourceHanSerif{TW,CN,JP,KR}/
+bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh          # all locales
+bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh tc       # one locale
+LOCALES=sc,ja bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh
 ```
 
-Output lands in `lib/EpdFont/scripts/output/EBGaramondSHS7000/`. Copy the folder to `/.fonts/EBGaramondSHS7000/` on the SD card.
+| Locale arg | Family folder | Source Han Serif | Charset |
+|---|---|---|---|
+| `tc` | `EBGaramondSHS-TC` | `source_fonts/SourceHanSerifTW` | Adobe regional subset as-is |
+| `sc` | `EBGaramondSHS-SC` | `source_fonts/SourceHanSerifCN` | Adobe regional subset as-is |
+| `ja` | `EBGaramondSHS-JA` | `source_fonts/SourceHanSerifJP` | Adobe regional subset as-is |
+| `ko` | `EBGaramondSHS-KO` | `source_fonts/SourceHanSerifKR` | Adobe regional subset as-is (+ Hangul intervals) |
+
+No second-pass character trim: every glyph present in the regional face that
+falls inside the locale intervals is rasterized. Firmware SC↔TC remaps
+(`ScToTcRemap` / `TcToScRemap`) still apply at runtime for cross-orthography
+EPUB text.
+
+Output lands in `lib/EpdFont/scripts/output/EBGaramondSHS-{TC,SC,JA,KO}/`.
+Copy a folder to `/.fonts/<name>/` on the SD card.
 
 Override font locations:
 
 ```bash
-EB_GARAMOND_DIR=/path/to/EB_Garamond/static \
-SHS_TC_DIR=/path/to/SourceHanSerifTC/OTF/TraditionalChinese \
-bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh
+SOURCE_FONTS_DIR=/path/to/source_fonts \
+bash lib/EpdFont/scripts/build-ebgaramond-cjk-sd.sh tc
 ```
 
-| `.cpfont` style | EB Garamond (primary) | Source Han Serif TC (fallback) |
+| `.cpfont` style | EB Garamond (primary) | Source Han Serif (fallback) |
 |---|---|---|
 | regular | Regular | Regular (CJK + Latin) |
 | bold | Bold | Bold (CJK + Latin) |
