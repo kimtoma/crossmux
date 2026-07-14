@@ -69,6 +69,32 @@ pio check                            # Static analysis (cppcheck)
 python3 scripts/debugging_monitor.py # Enhanced serial monitor
 ```
 
+**Desktop simulator** (from the repo root; configure/build SKUs sequentially
+because i18n generation uses shared files):
+```bash
+cmake -S simulator -B simulator/build_intl -DSIMULATOR_INTERNATIONAL_VERSION=ON
+cmake --build simulator/build_intl -j2
+cmake -S simulator -B simulator/build_tc
+cmake --build simulator/build_tc -j2
+cmake -S simulator -B simulator/build_sc -DSIMULATOR_CHINESE_UI_SIMPLIFIED=ON
+cmake --build simulator/build_sc -j2
+cmake -S simulator -B simulator/build_ja -DSIMULATOR_JAPANESE_VERSION=ON
+cmake --build simulator/build_ja -j2
+cmake -S simulator -B simulator/build_ko -DSIMULATOR_KOREAN_VERSION=ON
+cmake --build simulator/build_ko -j2
+```
+
+Run at explicit 1× scale:
+```bash
+SKU=tc  # intl, tc, sc, ja, or ko
+nohup ./simulator/build_${SKU}/crosspoint_simulator --scale 1 \
+  --sd-root ./simulator/sd_root >/tmp/crosspoint-simulator-${SKU}.log 2>&1 &
+```
+Use a background shell or a separate terminal application so the simulator
+stays alive; never attach it to a transient foreground command. Run only one
+simulator at a time against a given `sd_root`. See
+[`simulator/README.md`](simulator/README.md) for prerequisites and controls.
+
 ## The Map — where to look next
 
 | Topic | Read this when… | Doc |

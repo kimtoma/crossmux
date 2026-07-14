@@ -65,29 +65,33 @@ lifted out into its own repository (or vendored via `add_subdirectory` /
 brew install sdl2 cmake      # macOS
 # apt install libsdl2-dev cmake  # Linux
 
-# From repo root:
-cmake -S simulator -B simulator/build
-cmake --build simulator/build -j
-```
+# From repo root. Configure and build SKUs sequentially because gen_i18n writes
+# shared lib/I18n/ headers.
+# International
+cmake -S simulator -B simulator/build_intl -DSIMULATOR_INTERNATIONAL_VERSION=ON
+cmake --build simulator/build_intl -j2
 
-Default native/WASM builds enable `ENABLE_CHINESE_VERSION` with **Traditional**
-fonts/remap (like `gh_release_tc`). For other CJK SKUs, use a **separate** build
-directory (gen_i18n writes into shared `lib/I18n/` headers):
+# Traditional Chinese
+cmake -S simulator -B simulator/build_tc
+cmake --build simulator/build_tc -j2
 
-```sh
 # Simplified Chinese
 cmake -S simulator -B simulator/build_sc -DSIMULATOR_CHINESE_UI_SIMPLIFIED=ON
-cmake --build simulator/build_sc -j
+cmake --build simulator/build_sc -j2
 
 # Japanese
 cmake -S simulator -B simulator/build_ja -DSIMULATOR_JAPANESE_VERSION=ON
-cmake --build simulator/build_ja -j
-./simulator/build_ja/crosspoint_simulator --scale 1 --sd-root ./simulator/sd_root
+cmake --build simulator/build_ja -j2
 
 # Korean
 cmake -S simulator -B simulator/build_ko -DSIMULATOR_KOREAN_VERSION=ON
-cmake --build simulator/build_ko -j
+cmake --build simulator/build_ko -j2
 ```
+
+With no SKU option, the native/WASM build enables `ENABLE_CHINESE_VERSION` with
+Traditional fonts/remap (like `gh_release_tc`). Always keep the five native SKUs
+in the build directories shown above; reusing one directory can retain stale
+CMake options.
 
 CMake fetches ArduinoJson and `ricmoo/QRCode` via `FetchContent` on first configure
 (shallow clones, a few seconds).
@@ -121,12 +125,19 @@ See `crosspoint-web/SIMULATOR.md` for how the artifacts are embedded and served.
 ## Run
 
 ```sh
-./simulator/build/crosspoint_simulator --scale 1                    # standard 1× run
-./simulator/build/crosspoint_simulator --scale 1 --sd-root /tmp/sd  # custom sd_root
+# Run in a dedicated terminal (replace tc with intl/sc/ja/ko as needed).
+./simulator/build_tc/crosspoint_simulator --scale 1 --sd-root ./simulator/sd_root
+
+# Or detach it so closing the launching shell does not stop the simulator.
+nohup ./simulator/build_tc/crosspoint_simulator --scale 1 \
+  --sd-root ./simulator/sd_root >/tmp/crosspoint-simulator-tc.log 2>&1 &
 ```
 
 Development and test runs must use explicit 1× scale. Use another scale only when
-the user specifically requests it.
+the user specifically requests it. Agents must launch the simulator in a
+background shell or a separate terminal application rather than attaching it to
+a transient foreground command. Run only one simulator at a time against a given
+`sd_root`.
 
 Keyboard mapping (matches `MappedInputManager::Button::*`):
 
