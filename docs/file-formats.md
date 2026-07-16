@@ -98,15 +98,15 @@ if (parsedSize != fileSize) {
 ### Version 32
 
 > Chinese builds (`ENABLE_CHINESE_VERSION`) carry independent version counters:
-> Traditional (**70**) and Simplified / `CHINESE_UI_SIMPLIFIED` (**71**). The byte
+> Traditional (**73**) and Simplified / `CHINESE_UI_SIMPLIFIED` (**74**). The byte
 > layout is identical to the Latin version below; only the word-stream contents
 > differ (per-character CJK tokenization), so caches are not reusable across
-> flavors. TC **70** keeps 點號 (`、` `。` `，` `：` `；` `！` `？`, plus occasional
-> `．`) upright and centered in vertical-rl per CLREQ / Taiwan MOE. SC **71**
+> flavors. TC **73** keeps 點號 (`、` `。` `，` `：` `；` `！` `？`, plus occasional
+> `．`) upright and centered in vertical-rl per CLREQ / Taiwan MOE. SC **74**
 > remaps those marks to FE1x presentation forms like Japanese (corner-biased /
 > GB/T 直排偏右). Brackets and parentheses remap to FE3x/FE4x on all CJK SKUs.
 >
-> Japanese builds use version **72**; Korean builds use version **69**.
+> Japanese builds use version **75**; Korean builds use version **76**.
 >
 > Latin builds use version **54**. Counters track `writingMode`, em-based
 > in-column CJK pitch, CCW sideways Latin, vertical presentation-form punct
@@ -144,6 +144,12 @@ if (parsedSize != fileSize) {
 > the run head or opening brackets at the run end. Japanese builds also treat
 > small kana and the prolonged sound mark as line-start prohibited. Layout helpers
 > live in `lib/Epub/Epub/CjkKinsoku.h`.
+>
+> CJK versions 73–76 preserve author-provided spaces in the word stream. A source
+> space or tab forces the normal font space advance; a line-break-only segment is
+> removed between two no-space CJK characters but retained when either side is
+> Hangul or non-CJK. Version **76** therefore invalidates older Korean rendered
+> sections whose source word boundaries could have been collapsed.
 
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
