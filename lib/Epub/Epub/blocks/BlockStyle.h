@@ -31,7 +31,10 @@ struct BlockStyle {
   bool textAlignDefined = false;   // true if text-align was explicitly set in CSS
   bool isRtl = false;              // true if resolved direction is RTL
   bool directionDefined = false;   // true if direction was explicitly set in CSS/HTML
+<<<<<<< HEAD
   bool isVerticalRtl = false;      // true when user writing mode is vertical-rl (tategaki)
+=======
+>>>>>>> upstream/master
 
   // Combined insets (margin + padding)
   [[nodiscard]] int16_t leftInset() const { return marginLeft + paddingLeft; }

@@ -1,7 +1,11 @@
 # Webserver Endpoints
 
 This document describes the HTTP, WebSocket, WebDAV, and discovery endpoints
+<<<<<<< HEAD
 available while ryOS CrossMux is in File Transfer or Calibre Wireless mode.
+=======
+available while CrossPoint Reader is in File Transfer or Calibre Wireless mode.
+>>>>>>> upstream/master
 
 - HTTP server: port 80
 - WebSocket upload server: port 81
@@ -226,15 +230,23 @@ Types:
 | `toggle` | `value` (`0` or `1`) |
 | `enum` | `value`, `options` |
 | `value` | `value`, `min`, `max`, `step` |
+<<<<<<< HEAD
 | `string` | `value`; password fields also include `hasPassword` and always return an empty `value` |
+=======
+| `string` | `value` |
+>>>>>>> upstream/master
 
 The font-family setting includes SD-card font families when they are installed.
 
 ### `POST /api/settings`
 
+<<<<<<< HEAD
 Applies a partial settings update from a JSON object. Password string settings
 (`koPassword`) are only updated when a non-empty value is sent; omitting the key
 or sending an empty string leaves the existing password unchanged.
+=======
+Applies a partial settings update from a JSON object.
+>>>>>>> upstream/master
 
 ```bash
 curl -X POST \
@@ -313,12 +325,20 @@ Successful response:
 {"ok":true}
 ```
 
+<<<<<<< HEAD
 ## ryOS Books (OPDS) Server API
 
 ### `GET /api/opds`
 
 Lists saved book catalog servers. Passwords are never returned.
 Fresh installs are prefilled with the ryOS Books catalog at `https://os.ryo.lu/api/opds`.
+=======
+## OPDS Server API
+
+### `GET /api/opds`
+
+Lists saved OPDS servers. Passwords are never returned.
+>>>>>>> upstream/master
 
 ```bash
 curl http://crosspoint.local/api/opds
@@ -330,29 +350,48 @@ Response:
 [
   {
     "index": 0,
+<<<<<<< HEAD
     "name": "ryOS Books",
     "url": "https://os.ryo.lu/api/opds",
     "username": "",
     "hasPassword": false
+=======
+    "name": "My Catalog",
+    "url": "http://calibre.local:8080/opds",
+    "username": "reader",
+    "hasPassword": true
+>>>>>>> upstream/master
   }
 ]
 ```
 
 ### `POST /api/opds`
 
+<<<<<<< HEAD
 Adds or updates a book catalog server. Include `index` to update an existing entry.
+=======
+Adds or updates an OPDS server. Include `index` to update an existing entry.
+>>>>>>> upstream/master
 If `password` is omitted during an update, the existing password is preserved.
 
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
+<<<<<<< HEAD
   -d '{"name":"Home Calibre","url":"http://calibre.local:8080/opds","username":"reader","password":"secret"}' \
+=======
+  -d '{"name":"My Catalog","url":"http://calibre.local:8080/opds","username":"reader","password":"secret"}' \
+>>>>>>> upstream/master
   http://crosspoint.local/api/opds
 ```
 
 ### `POST /api/opds/delete`
 
+<<<<<<< HEAD
 Deletes a book catalog server by index.
+=======
+Deletes an OPDS server by index.
+>>>>>>> upstream/master
 
 ```bash
 curl -X POST \
@@ -408,6 +447,7 @@ curl -X POST \
   http://crosspoint.local/api/wifi/delete
 ```
 
+<<<<<<< HEAD
 ## WeRead API (Chinese build only)
 
 These endpoints are available **only in the `gh_release_tc` build** (the same
@@ -469,6 +509,8 @@ Error responses:
 Error strings are intentionally Traditional Chinese to match the locale of the only build
 that exposes this endpoint.
 
+=======
+>>>>>>> upstream/master
 ## WebSocket Upload
 
 ### Port 81

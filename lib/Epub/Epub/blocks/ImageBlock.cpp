@@ -1,6 +1,9 @@
 #include "ImageBlock.h"
 
+<<<<<<< HEAD
 #include <DirectPixelWriter.h>
+=======
+>>>>>>> upstream/master
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
 #include <Logging.h>

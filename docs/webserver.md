@@ -1,7 +1,12 @@
 # Web Server Guide
 
+<<<<<<< HEAD
 This guide explains how to use ryOS CrossMux's built-in web server for file
 transfer, device settings, Wi-Fi/ryOS Books management, and SD-card font management.
+=======
+This guide explains how to use CrossPoint Reader's built-in web server for file
+transfer, device settings, Wi-Fi/OPDS management, and SD-card font management.
+>>>>>>> upstream/master
 
 ## Overview
 
@@ -11,7 +16,11 @@ The web server is available while the device is in **File Transfer** or
 - Upload, download, rename, move, and delete files on the SD card
 - Create folders
 - Edit many device settings from a browser
+<<<<<<< HEAD
 - Manage saved Wi-Fi networks and ryOS Books catalog servers
+=======
+- Manage saved Wi-Fi networks and OPDS servers
+>>>>>>> upstream/master
 - Upload and delete `.cpfont` SD-card font families
 - Accept WebDAV clients and Calibre wireless uploads
 
@@ -67,8 +76,13 @@ instructions and upload progress on the reader. Use this mode with the
 CrossPoint Calibre plugin or other clients that speak the documented WebSocket
 upload protocol.
 
+<<<<<<< HEAD
 For Calibre catalog browsing, add `/opds` to the catalog URL when configuring an
 extra book server under ryOS Books.
+=======
+For Calibre OPDS browsing, add `/opds` to the catalog URL when configuring an
+OPDS server.
+>>>>>>> upstream/master
 
 ## Web Interface
 
@@ -101,12 +115,19 @@ The Settings page exposes many firmware settings in the browser. It also has
 cards for:
 
 - Saved Wi-Fi networks
+<<<<<<< HEAD
 - ryOS Books catalog servers
 - ryOS Cloud Sync credentials (username, password, server URL)
 
 Passwords are accepted when adding or editing entries, but saved passwords are
 not returned by the API. Leaving a password field blank keeps the existing
 password unchanged.
+=======
+- OPDS servers
+
+Passwords are accepted when adding or editing entries, but saved passwords are
+not returned by the API.
+>>>>>>> upstream/master
 
 ### Fonts
 

@@ -558,6 +558,7 @@ bool SdCardFont::load(const char* path) {
       freeAll();
       return false;
     }
+<<<<<<< HEAD
 
     const uint32_t intervalCount = s.header.intervalCount;
     // Batch-read intervals. A sparse CJK subset has ~4k intervals; reading them
@@ -585,11 +586,62 @@ bool SdCardFont::load(const char* path) {
       }
     } else {
       s.bmpIntervals = new (std::nothrow) PerStyle::BmpInterval16[intervalCount];
+=======
+
+    // Validate interval contents before any later code (findGlobalGlyphIndex,
+    // glyph reads) trusts them. A malformed file could otherwise drive
+    // out-of-range glyph indices into bogus on-disk reads.
+    bool canUseBmp16 = s.header.glyphCount <= UINT16_MAX;
+    uint32_t expectedOffset = 0;
+    uint32_t prevLast = 0;
+    EpdUnicodeInterval iv{};
+    for (uint32_t j = 0; j < s.header.intervalCount; ++j) {
+      if (file.read(reinterpret_cast<uint8_t*>(&iv), sizeof(iv)) != sizeof(iv)) {
+        LOG_ERR("SDCF", "Failed to read interval %u for style %u", j, i);
+        freeAll();
+        return false;
+      }
+      if (iv.first > iv.last) {
+        LOG_ERR("SDCF", "Style %u: invalid interval %u (first 0x%lX > last 0x%lX)", i, j,
+                static_cast<unsigned long>(iv.first), static_cast<unsigned long>(iv.last));
+        file.close();
+        freeAll();
+        return false;
+      }
+      const uint32_t span = iv.last - iv.first + 1;
+      const bool overlapsPrev = (j > 0 && iv.first <= prevLast);
+      const bool spanTooBig = (span > s.header.glyphCount);
+      const bool offsetMismatch = (iv.offset != expectedOffset);
+      const bool offsetOverruns = (iv.offset > s.header.glyphCount - span);
+      if (overlapsPrev || spanTooBig || offsetMismatch || offsetOverruns) {
+        LOG_ERR("SDCF", "Style %u: invalid interval layout at %u (overlap=%d span=%u offMis=%d offOver=%d)", i, j,
+                overlapsPrev, span, offsetMismatch, offsetOverruns);
+        file.close();
+        freeAll();
+        return false;
+      }
+      if (iv.first > UINT16_MAX || iv.last > UINT16_MAX || iv.offset > UINT16_MAX) {
+        canUseBmp16 = false;
+      }
+      expectedOffset += span;
+      prevLast = iv.last;
+    }
+
+    if (!file.seekSet(s.intervalsFileOffset)) {
+      LOG_ERR("SDCF", "Failed to seek back to intervals for style %u", i);
+      freeAll();
+      return false;
+    }
+
+    if (canUseBmp16) {
+      s.bmpIntervals = new (std::nothrow) PerStyle::BmpInterval16[s.header.intervalCount];
+>>>>>>> upstream/master
       if (!s.bmpIntervals) {
         LOG_ERR("SDCF", "Failed to allocate compact intervals for style %u", i);
         freeAll();
         return false;
       }
+<<<<<<< HEAD
     }
 
     uint32_t expectedOffset = 0;
@@ -632,6 +684,30 @@ bool SdCardFont::load(const char* path) {
         }
         expectedOffset += span;
         prevLast = iv.last;
+=======
+      for (uint32_t j = 0; j < s.header.intervalCount; ++j) {
+        if (file.read(reinterpret_cast<uint8_t*>(&iv), sizeof(iv)) != sizeof(iv)) {
+          LOG_ERR("SDCF", "Failed to read compact interval %u for style %u", j, i);
+          freeAll();
+          return false;
+        }
+        s.bmpIntervals[j] = {static_cast<uint16_t>(iv.first), static_cast<uint16_t>(iv.last),
+                             static_cast<uint16_t>(iv.offset)};
+      }
+      s.intervalsAreBmp16 = true;
+    } else {
+      s.fullIntervals = new (std::nothrow) EpdUnicodeInterval[s.header.intervalCount];
+      if (!s.fullIntervals) {
+        LOG_ERR("SDCF", "Failed to allocate %u intervals for style %u", s.header.intervalCount, i);
+        freeAll();
+        return false;
+      }
+      size_t intervalsBytes = s.header.intervalCount * sizeof(EpdUnicodeInterval);
+      if (file.read(reinterpret_cast<uint8_t*>(s.fullIntervals), intervalsBytes) != static_cast<int>(intervalsBytes)) {
+        LOG_ERR("SDCF", "Failed to read intervals for style %u", i);
+        freeAll();
+        return false;
+>>>>>>> upstream/master
       }
       base += n;
     }

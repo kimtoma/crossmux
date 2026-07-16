@@ -82,7 +82,10 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
 
   const bool scanning = renderer.isFontCacheScanning();
   const int ascender = renderer.getFontAscenderSize(fontId);
+<<<<<<< HEAD
   const bool verticalRtl = blockStyle.isVerticalRtl;
+=======
+>>>>>>> upstream/master
   for (size_t i = 0; i < words.size(); i++) {
     const int wordX = verticalRtl ? x : wordXpos[i] + x;
     const int wordY = verticalRtl ? y + wordXpos[i] : y;
@@ -91,6 +94,7 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
         BidiUtils::detectParagraphLevel(words[i].c_str(), blockStyle.isRtl ? 1 : 0));
     const uint8_t boundary = hasFocus ? wordFocusBoundary[i] : 0;
 
+<<<<<<< HEAD
     // SUP/SUB shift the baseline passed to the renderer; glyphs are scaled 50% there.
     // Horizontal text shifts along Y; vertical text rotates the same shift onto X.
     int drawX = wordX;
@@ -133,6 +137,17 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
       // advance down the reserved cell so the run cannot climb into the previous glyph.
       renderer.drawTextRotated90CCW(fontId, drawX, drawY, words[i].c_str(), true, currentStyle);
       continue;
+=======
+    // SUP/SUB shift the baseline passed to drawText; the glyph is also scaled 50% inside
+    // drawText, so these offsets are chosen relative to the full-size ascender:
+    //   SUP: raise by 40% of ascender — sits clearly above the cap-height
+    //   SUB: lower by 25% of ascender — descends below baseline without clashing with ascenders below
+    int wordY = y;
+    if ((currentStyle & EpdFontFamily::SUP) != 0) {
+      wordY -= ascender * 2 / 5;
+    } else if ((currentStyle & EpdFontFamily::SUB) != 0) {
+      wordY += ascender / 4;
+>>>>>>> upstream/master
     }
 
     if (boundary > 0) {
@@ -148,6 +163,7 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
       const size_t boldLen = std::min<size_t>({static_cast<size_t>(boundary), words[i].size(), sizeof(boldBuf) - 1});
       memcpy(boldBuf, words[i].c_str(), boldLen);
       boldBuf[boldLen] = '\0';
+<<<<<<< HEAD
       renderer.drawText(fontId, drawX, drawY, boldBuf, true, boldStyle, baseDir);
       const int suffixX = drawX + wordFocusSuffixX[i];
       renderer.drawText(fontId, suffixX, drawY, words[i].c_str() + boldLen, true, currentStyle, baseDir);
@@ -194,6 +210,25 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
       }
 
       renderer.drawLine(startX, underlineY, startX + underlineWidth, underlineY, true);
+=======
+      renderer.drawText(fontId, wordX, wordY, boldBuf, true, boldStyle, baseDir);
+      const int suffixX = wordX + wordFocusSuffixX[i];
+      renderer.drawText(fontId, suffixX, wordY, words[i].c_str() + boldLen, true, currentStyle, baseDir);
+    } else {
+      renderer.drawText(fontId, wordX, wordY, words[i].c_str(), true, currentStyle, baseDir);
+    }
+
+    if (!scanning && (currentStyle & EpdFontFamily::UNDERLINE) != 0) {
+      const std::string& w = words[i];
+      int underlineWidth = renderer.getTextWidth(fontId, w.c_str(), currentStyle, baseDir);
+      const int underlineY = wordY + ascender + 2;
+
+      if ((currentStyle & (EpdFontFamily::SUP | EpdFontFamily::SUB)) != 0) {
+        underlineWidth = (underlineWidth + 1) / 2;
+      }
+
+      renderer.drawLine(wordX, underlineY, wordX + underlineWidth, underlineY, true);
+>>>>>>> upstream/master
     }
   }
 }
@@ -239,7 +274,10 @@ bool TextBlock::serialize(HalFile& file) const {
   serialization::writePod(file, blockStyle.textIndentDefined);
   serialization::writePod(file, blockStyle.isRtl);
   serialization::writePod(file, blockStyle.directionDefined);
+<<<<<<< HEAD
   serialization::writePod(file, blockStyle.isVerticalRtl);
+=======
+>>>>>>> upstream/master
 
   return true;
 }
@@ -295,7 +333,10 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(HalFile& file) {
   serialization::readPod(file, blockStyle.textIndentDefined);
   serialization::readPod(file, blockStyle.isRtl);
   serialization::readPod(file, blockStyle.directionDefined);
+<<<<<<< HEAD
   serialization::readPod(file, blockStyle.isVerticalRtl);
+=======
+>>>>>>> upstream/master
 
   return std::unique_ptr<TextBlock>(new TextBlock(std::move(words), std::move(wordXpos), std::move(wordStyles),
                                                   std::move(wordFocusBoundary), std::move(wordFocusSuffixX),

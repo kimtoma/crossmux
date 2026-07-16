@@ -43,6 +43,9 @@ add_subdirectory(release_json_parser)
 add_subdirectory(differential_rounding)
 add_subdirectory(hyphenation_eval)
 add_subdirectory(utf8_compose)
+<<<<<<< HEAD
 add_subdirectory(vertical_punctuation)
 add_subdirectory(cjk_kinsoku)
 add_subdirectory(cjk_punct_compression)
+=======
+>>>>>>> upstream/master

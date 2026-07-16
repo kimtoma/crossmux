@@ -17,7 +17,10 @@
 #include <iterator>
 #include <limits>
 
+<<<<<<< HEAD
 #include "AchievementsStore.h"
+=======
+>>>>>>> upstream/master
 #include "BookmarkEntry.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -36,7 +39,10 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+<<<<<<< HEAD
 #include "util/AchievementPopupUtils.h"
+=======
+>>>>>>> upstream/master
 #include "util/BookmarkUtil.h"
 #include "util/ScreenshotUtil.h"
 
@@ -264,6 +270,8 @@ void EpubReaderActivity::onEnter() {
 
   loadCachedBookmarks();
 
+  loadCachedBookmarks();
+
   // Trigger first update
   requestUpdate();
 }
@@ -281,15 +289,21 @@ void EpubReaderActivity::onExit() {
 
   // Leaving mid-footnote loses the in-RAM return stack on deep sleep; persist the
   // pre-footnote position so the book reopens at the link origin, not the footnote.
+<<<<<<< HEAD
   // Runs before endSession() so the final stats progress reflects the link origin.
+=======
+>>>>>>> upstream/master
   if (footnoteDepth > 0 && epub) {
     const SavedPosition& origin = savedPositions[0];
     saveProgress(origin.spineIndex, origin.pageNumber, 0);
   }
 
+<<<<<<< HEAD
   READING_STATS.endSession();
   ACHIEVEMENTS.recordSessionEnded(READING_STATS.getLastSessionSnapshot());
   showPendingAchievementPopups(renderer);
+=======
+>>>>>>> upstream/master
   section.reset();
   if (pendingReadFolderMove && epub) {
     const std::string srcPath = epub->getPath();
@@ -386,6 +400,7 @@ void EpubReaderActivity::loop() {
         bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
       }
       const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
+<<<<<<< HEAD
       startActivityForResult(
           std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, epub->getTitle(), currentPage, totalPages,
                                                    bookProgressPercent, SETTINGS.orientation, SETTINGS.writingMode,
@@ -401,6 +416,20 @@ void EpubReaderActivity::loop() {
               onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
             }
           });
+=======
+      startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
+                                 renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
+                                 SETTINGS.orientation, !currentPageFootnotes.empty(), !cachedBookmarks.empty()),
+                             [this](const ActivityResult& result) {
+                               // Always apply orientation change even if the menu was cancelled
+                               const auto& menu = std::get<MenuResult>(result.data);
+                               applyOrientation(menu.orientation);
+                               toggleAutoPageTurn(menu.pageTurnOption);
+                               if (!result.isCancelled) {
+                                 onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
+                               }
+                             });
+>>>>>>> upstream/master
     }
   }
 
@@ -418,11 +447,21 @@ void EpubReaderActivity::loop() {
         }
         break;
       case CrossPointSettings::LP_MENU_KOSYNC:
+<<<<<<< HEAD
         // Hold ~1s launches KOReader sync (or the credentials hint if not logged in).
         if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
           launchKOReaderSync();
           ignoreNextConfirmRelease = true;  // sync launched or error shown; suppress menu open
           return;
+=======
+        // Hold ~1s launches KOReader sync. If sync can't run (no credentials stored), fall
+        // through so the normal Confirm-release still opens the reader menu.
+        if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+          if (launchKOReaderSync()) {
+            ignoreNextConfirmRelease = true;  // sync launched or error shown; suppress menu open
+            return;
+          }
+>>>>>>> upstream/master
         }
         break;
       case CrossPointSettings::LP_MENU_DISABLED:
@@ -627,7 +666,10 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       startActivityForResult(
           std::make_unique<EpubReaderChapterSelectionActivity>(renderer, mappedInput, epub, path, spineIdx),
           [this](const ActivityResult& result) {
+<<<<<<< HEAD
             READING_STATS.resumeSession();
+=======
+>>>>>>> upstream/master
             if (!result.isCancelled) {
               const auto& chapterResult = std::get<ChapterResult>(result.data);
               RenderLock lock(*this);
@@ -719,6 +761,19 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     }
     case EpubReaderMenuActivity::MenuAction::SYNC: {
       launchKOReaderSync();
+<<<<<<< HEAD
+=======
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
+      startActivityForResult(
+          std::make_unique<EpubReaderBookmarksActivity>(renderer, mappedInput, epub, epub->getPath()),
+          progressChangeResultHandler);
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::TOGGLE_BOOKMARK: {
+      addBookmark();
+>>>>>>> upstream/master
       break;
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
@@ -744,6 +799,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
   }
 }
 
+<<<<<<< HEAD
 void EpubReaderActivity::launchKOReaderSync() {
   // No credentials: still open the sync activity so the user sees how to log in
   // (Settings > System). Skip Wi-Fi/TLS prep — onEnter short-circuits to NO_CREDENTIALS.
@@ -758,6 +814,10 @@ void EpubReaderActivity::launchKOReaderSync() {
                                                totalPages, SavedProgressPosition{}, std::string{}, std::nullopt));
     return;
   }
+=======
+bool EpubReaderActivity::launchKOReaderSync() {
+  if (!KOREADER_STORE.hasCredentials()) return false;  // no-op: nothing to launch
+>>>>>>> upstream/master
 
   const int currentPage = section ? section->currentPage : nextPageNumber;
   const int totalPages = section ? section->pageCount : cachedChapterTotalPageCount;
@@ -783,7 +843,11 @@ void EpubReaderActivity::launchKOReaderSync() {
     LOG_ERR("KOSync", "Aborting sync because current progress could not be saved");
     pendingSyncSaveError = true;
     requestUpdate();
+<<<<<<< HEAD
     return;  // acted: surfaced a save error to the user
+=======
+    return true;  // acted: surfaced a save error to the user
+>>>>>>> upstream/master
   }
 
   // Release Epub and Section to free ~65KB RAM for the TLS handshake.
@@ -801,6 +865,10 @@ void EpubReaderActivity::launchKOReaderSync() {
   activityManager.replaceActivity(std::make_unique<KOReaderSyncActivity>(
       renderer, mappedInput, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
       std::move(localChapterName), paragraphIndex));
+<<<<<<< HEAD
+=======
+  return true;  // acted: launched the sync activity
+>>>>>>> upstream/master
 }
 
 void EpubReaderActivity::applyOrientation(const uint8_t orientation) {
@@ -1180,7 +1248,10 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // Font prewarm: scan pass accumulates text, then prewarm, then real render
   auto* fcm = renderer.getFontCacheManager();
   auto scope = fcm->createPrewarmScope();
+<<<<<<< HEAD
   TextBlock::fakeBold = SETTINGS.fakeBold;
+=======
+>>>>>>> upstream/master
   page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);  // scan pass
   scope.endScanAndPrewarm();
   const auto tPrewarm = millis();
@@ -1233,15 +1304,23 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // Tiled grayscale: render each plane band-by-band into a small scratch and
   // stream straight to the controller, leaving the BW framebuffer intact so no
   // full-frame storeBwBuffer is needed; controller RAM is re-synced from the
+<<<<<<< HEAD
   // live framebuffer afterward. Text AA uses GRAYSCALE_DUAL so each strip is
   // filled once (LSB+MSB together) instead of re-walking the page twice —
   // dense CJK pages were spending most of their time in those extra walks.
   // Glyphs still cull out-of-band before decode. Both text (DirectPixelWriter)
   // and images honor the active strip target.
+=======
+  // live framebuffer afterward. The page is re-rendered ceil(H/STRIP_ROWS) times
+  // per plane, but renderCharImpl culls out-of-band glyphs before decode so the
+  // cost stays close to one render. Both text (drawPixel) and images
+  // (DirectPixelWriter) honor the active strip target.
+>>>>>>> upstream/master
   if (needsAnyGrayscale && renderer.supportsStripGrayscale()) {
     constexpr int STRIP_ROWS = 80;
     const int gh = renderer.getDisplayHeight();
     const int gwBytes = renderer.getDisplayWidthBytes();
+<<<<<<< HEAD
     const size_t stripBytes = static_cast<size_t>(gwBytes) * STRIP_ROWS;
 
     // Dual scratch: ~8 KB × 2 temporary page-render buffers (stack too small;
@@ -1304,6 +1383,53 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
               "gray_display=%lums cleanup=%lums total=%lums",
               tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, tGrayPlanes - tGrayStart,
               tGrayDisplay - tGrayPlanes, tCleanup - tGrayDisplay, tEnd - t0);
+=======
+
+    auto scratch = makeUniqueNoThrow<uint8_t[]>(static_cast<size_t>(gwBytes) * STRIP_ROWS);
+    if (!scratch) {
+      LOG_ERR("ERS", "OOM: grayscale strip scratch (%d bytes); skipping AA this page", gwBytes * STRIP_ROWS);
+    } else {
+      // Bands may be streamed in any order: X4 windows each via setRamArea, X3
+      // via PTL.
+      renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
+      for (int y = 0; y < gh; y += STRIP_ROWS) {
+        const int rows = (gh - y < STRIP_ROWS) ? (gh - y) : STRIP_ROWS;
+        renderer.beginStripTarget(scratch.get(), y, rows);
+        renderer.clearScreen(0x00);
+        renderGrayscalePass();
+        renderer.endStripTarget();
+        renderer.writeGrayscalePlaneStrip(true, scratch.get(), y, rows);
+      }
+      const auto tGrayLsb = millis();
+
+      // MSB plane.
+      renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+      for (int y = 0; y < gh; y += STRIP_ROWS) {
+        const int rows = (gh - y < STRIP_ROWS) ? (gh - y) : STRIP_ROWS;
+        renderer.beginStripTarget(scratch.get(), y, rows);
+        renderer.clearScreen(0x00);
+        renderGrayscalePass();
+        renderer.endStripTarget();
+        renderer.writeGrayscalePlaneStrip(false, scratch.get(), y, rows);
+      }
+      const auto tGrayMsb = millis();
+
+      renderer.setRenderMode(GfxRenderer::BW);
+      renderer.displayGrayBuffer();
+      const auto tGrayDisplay = millis();
+
+      // BW framebuffer is intact; re-sync controller RAM for the next
+      // differential page turn directly from it.
+      renderer.cleanupGrayscaleWithFrameBuffer();
+      const auto tCleanup = millis();
+
+      const auto tEnd = millis();
+      LOG_DBG("ERS",
+              "Page render (tiled): prewarm=%lums bw_render=%lums display=%lums gray_lsb=%lums "
+              "gray_msb=%lums gray_display=%lums cleanup=%lums total=%lums",
+              tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, tGrayLsb - tDisplay, tGrayMsb - tGrayLsb,
+              tGrayDisplay - tGrayMsb, tCleanup - tGrayDisplay, tEnd - t0);
+>>>>>>> upstream/master
     }
   } else {
     // Fallback path for a controller without strip support. grayscale rendering

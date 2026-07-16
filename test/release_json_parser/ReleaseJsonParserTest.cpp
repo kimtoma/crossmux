@@ -184,6 +184,7 @@ TEST(ReleaseJsonParser, FirmwareNotFirstAsset) {
   EXPECT_EQ(p.getFirmwareSize(), 987654u);
 }
 
+<<<<<<< HEAD
 TEST(ReleaseJsonParser, SelectsRequestedTraditionalChineseFirmwareAsset) {
   const char* json = R"({
       "tag_name": "1.4.13",
@@ -262,6 +263,8 @@ TEST(ReleaseJsonParser, SelectsRequestedKoreanFirmwareAsset) {
   EXPECT_EQ(p.getFirmwareSize(), 5900000u);
 }
 
+=======
+>>>>>>> upstream/master
 TEST(ReleaseJsonParser, FieldOrderUrlBeforeName) {
   const char* json = R"({
       "tag_name": "v3.0",

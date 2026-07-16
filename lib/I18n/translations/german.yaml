@@ -254,7 +254,11 @@ STR_BOOKMARKS: "Lesezeichen"
 STR_BOOKMARK_ADDED: "Lesezeichen hinzugefügt."
 STR_BOOKMARK_REMOVED: "Lesezeichen entfernt."
 STR_SEARCH: "Suche"
+<<<<<<< HEAD
 STR_OPDS_BROWSER: "ryOS Books"
+=======
+STR_OPDS_BROWSER: "OPDS-Browser"
+>>>>>>> upstream/master
 STR_COVER_CUSTOM: "Cover + Eigenes"
 STR_QUICK_RESUME: "Schnelles Fortsetzen"
 STR_MENU_RECENT_BOOKS: "Zuletzt gelesen"
@@ -315,7 +319,11 @@ STR_UPLOAD: "Hochladen"
 STR_BOOK_S_STYLE: "Buch-Stil"
 STR_EMBEDDED_STYLE: "Eingebetteter Stil"
 STR_FOCUS_READING: "Fokus-Lesen"
+<<<<<<< HEAD
 STR_OPDS_SERVER_URL: "Server URL"
+=======
+STR_OPDS_SERVER_URL: "OPDS-Server-URL"
+>>>>>>> upstream/master
 STR_SET_SLEEP_COVER: "Wähle Cover"
 STR_SCREENSHOT_BUTTON: "Screenshot aufnehmen"
 STR_FOOTNOTES: "Fußnoten"
@@ -326,9 +334,15 @@ STR_SLEEP_NEVER: "Nie"
 STR_SLEEP_TIMER_STEP_HINT: "Links/Rechts: 1 Min.  Hoch/Runter: 5 Min."
 STR_ADD_SERVER: "Server hinzufügen"
 STR_SERVER_NAME: "Servername"
+<<<<<<< HEAD
 STR_NO_SERVERS: "No book servers configured"
 STR_DELETE_SERVER: "Server entfernen"
 STR_OPDS_SERVERS: "ryOS Books"
+=======
+STR_NO_SERVERS: "Keine OPDS-Server konfiguriert"
+STR_DELETE_SERVER: "Server entfernen"
+STR_OPDS_SERVERS: "OPDS-Server"
+>>>>>>> upstream/master
 STR_AUTO_TURN_ENABLED: "Auto-Umblättern aktiv: "
 STR_AUTO_TURN_PAGES_PER_MIN: "Auto-Umblättern (Seiten/Min.)"
 STR_IMAGES: "Bilder"

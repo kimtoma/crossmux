@@ -10,6 +10,7 @@
 #include "parsers/ChapterHtmlSlimParser.h"
 
 namespace {
+<<<<<<< HEAD
 // Cache layout version. Latin and CJK builds emit different word streams
 // (per-character CJK tokenization + 禁则 + full-width padding live behind
 // ENABLE_CJK_VERSION), so cached pages from one flavor cannot be reused by
@@ -31,6 +32,10 @@ constexpr uint8_t SECTION_FILE_VERSION = 69;  // KO: isolated upright 1-char Lat
 #else
 constexpr uint8_t SECTION_FILE_VERSION = 54;  // isolated upright 1-char Latin/digit → fullwidth
 #endif
+=======
+// v27: words NFC-composed at layout time; bump invalidates NFD section caches.
+constexpr uint8_t SECTION_FILE_VERSION = 27;
+>>>>>>> upstream/master
 constexpr uint32_t HEADER_SIZE = sizeof(uint8_t) + sizeof(int) + sizeof(float) + sizeof(bool) + sizeof(uint8_t) +
                                  sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint16_t) +
                                  sizeof(bool) + sizeof(bool) + sizeof(uint8_t) + sizeof(bool) + sizeof(bool) +

@@ -46,11 +46,20 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   // on top of the TLS session's heap during the fetch; with -fno-exceptions an
   // OOM there aborts. fetchUrl handles the verified-https GET, redirects, and
   // User-Agent (see HttpDownloader).
+<<<<<<< HEAD
   ReleaseJsonParser releaseParser(firmwareAssetName);
   if (HttpDownloader::fetchUrl(latestReleaseUrl, [&releaseParser](const uint8_t* data, size_t len) {
         releaseParser.feed(reinterpret_cast<const char*>(data), len);
         return true;
       }) != HttpDownloader::OK) {
+=======
+  ReleaseJsonParser releaseParser;
+  const bool ok = HttpDownloader::fetchUrl(latestReleaseUrl, [&releaseParser](const uint8_t* data, size_t len) {
+    releaseParser.feed(reinterpret_cast<const char*>(data), len);
+    return true;
+  });
+  if (!ok) {
+>>>>>>> upstream/master
     LOG_ERR("OTA", "Release check fetch failed");
     return HTTP_ERROR;
   }

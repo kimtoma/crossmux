@@ -1,7 +1,10 @@
 #include "ParsedText.h"
 
 #include <BidiUtils.h>
+<<<<<<< HEAD
 #include <EpdFontData.h>
+=======
+>>>>>>> upstream/master
 #include <GfxRenderer.h>
 #include <Utf8.h>
 
@@ -30,6 +33,7 @@ constexpr size_t RTL_PARAGRAPH_PROBE_WORDS = 3;
 constexpr int RTL_PER_WORD_PROBE_DEPTH = 64;
 constexpr size_t MIN_JUSTIFY_GAPS = 1;
 
+<<<<<<< HEAD
 // Line/column-start openers (「（《…) put their blank on the leading side: large
 // positive glyph.left, ink on the trailing half of the em cell. Hang by that
 // left bearing (not merely em/2) and keep a full advance so the next glyph
@@ -370,6 +374,8 @@ void remapVerticalPunctuationInPlace(std::string& word, VerticalPunctRemapState&
   word.swap(out);
 }
 
+=======
+>>>>>>> upstream/master
 // Byte-level pre-check: Hebrew UTF-8 lead bytes 0xD6-0xD7, Arabic/Syriac 0xD8-0xDB.
 bool mayContainRtlBytes(const char* str) {
   for (const auto* p = reinterpret_cast<const unsigned char*>(str); *p; ++p) {
@@ -425,6 +431,75 @@ int verticalGapBeforeWord(const GfxRenderer& renderer, const int fontId, const s
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
+<<<<<<< HEAD
+=======
+bool isNoBreakBeforeCjkPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool isNoBreakAfterCjkPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '(':
+    case '[':
+    case '{':
+    case 0x00AB:  // «
+    case 0x2018:  // ‘
+    case 0x201C:  // “
+    case 0x3008:  // 〈
+    case 0x300A:  // 《
+    case 0x300C:  // 「
+    case 0x300E:  // 『
+    case 0x3010:  // 【
+    case 0x3014:  // 〔
+    case 0x3016:  // 〖
+    case 0x3018:  // 〘
+    case 0x301A:  // 〚
+    case 0xFF08:  // （
+    case 0xFF3B:  // ［
+    case 0xFF5B:  // ｛
+      return true;
+    default:
+      return false;
+  }
+}
+
+>>>>>>> upstream/master
 bool containsCjkBreakableCodepoint(const std::string& text) {
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
   while (*ptr) {
@@ -437,6 +512,7 @@ bool containsCjkBreakableCodepoint(const std::string& text) {
 }
 
 bool hasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp) {
+<<<<<<< HEAD
   return CjkKinsoku::hasCjkBreakOpportunityBetween(leftCp, rightCp);
 }
 
@@ -444,6 +520,12 @@ bool hasCjkBreakOpportunityBetween(const uint32_t leftCp, const uint32_t rightCp
 bool isLegalWordBreakAfter(const std::vector<std::string>& wordList, const size_t leftIdx, const size_t rightIdx) {
   if (rightIdx >= wordList.size()) return true;
   return CjkKinsoku::isLegalBreakBetween(lastCodepoint(wordList[leftIdx]), firstCodepoint(wordList[rightIdx]));
+=======
+  if (!utf8IsCjkBreakable(leftCp) && !utf8IsCjkBreakable(rightCp)) return false;
+  if (isNoBreakAfterCjkPunctuation(leftCp) || isNoBreakBeforeCjkPunctuation(rightCp)) return false;
+  if (utf8IsCombiningMark(rightCp)) return false;
+  return true;
+>>>>>>> upstream/master
 }
 
 std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
@@ -575,6 +657,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
 
   const auto pushToken = [&](std::string token, const bool continues, const bool noSpaceBefore,
                              const bool isFocusSuffix) {
+<<<<<<< HEAD
     bool effectiveContinues = continues;
     // 分離禁則: keep ellipsis/dash runs and digit+unit / currency+digit glued via continues.
     if (!words.empty() && !effectiveContinues &&
@@ -584,6 +667,11 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     words.push_back(std::move(token));
     wordStyles.push_back(baseStyle);
     wordContinues.push_back(effectiveContinues);
+=======
+    words.push_back(std::move(token));
+    wordStyles.push_back(baseStyle);
+    wordContinues.push_back(continues);
+>>>>>>> upstream/master
     wordNoSpaceBefore.push_back(noSpaceBefore);
     wordIsFocusSuffix.push_back(isFocusSuffix);
   };
@@ -780,11 +868,14 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     return;
   }
 
+<<<<<<< HEAD
   if (blockStyle.isVerticalRtl && viewportHeight > 0) {
     layoutAndExtractVerticalColumns(renderer, fontId, viewportHeight, processLine, includeLastLine);
     return;
   }
 
+=======
+>>>>>>> upstream/master
   // Per-paragraph RTL auto-detection: only when CSS/HTML didn't explicitly set direction.
   // Explicit dir="ltr" must be respected and not overridden by content heuristic.
   if (!blockStyle.directionDefined && hasRtlWord) {
@@ -1334,6 +1425,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     lineWords.push_back(std::move(word));
     lineWordStyles.push_back(wordStyles[lastBreakAt + i]);
   }
+<<<<<<< HEAD
 
   // Per-line advances: copy compressed paragraph widths, then apply line-edge
   // trims after kinsoku has finalized this break (start/end of the run only).
@@ -1358,6 +1450,8 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       lineAdvances.back() = CjkPunctCompression::clampAdvanceAfterTrim(lineAdvances.back(), edge.endTrim, emPx);
     }
   }
+=======
+>>>>>>> upstream/master
 
   // Calculate total word width for this line, count actual word gaps,
   // and accumulate total natural gap widths (including space kerning adjustments).
@@ -1434,7 +1528,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       const uint16_t src = visualOrderScratch[i];
       reorderedWordsScratch.push_back(std::move(lineWords[src]));
       reorderedStylesScratch.push_back(lineWordStyles[src]);
+<<<<<<< HEAD
       reorderedWidthsScratch.push_back(lineAdvances[src]);
+=======
+      reorderedWidthsScratch.push_back(wordWidths[lastBreakAt + src]);
+>>>>>>> upstream/master
       reorderedFocusSuffixScratch.push_back(wordIsFocusSuffix[lastBreakAt + src]);
 
       // Continuation means "no break/gap between two adjacent logical tokens".
@@ -1499,11 +1597,19 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
         xpos = (effectivePageWidth - contentWidth) / 2;
       }
     } else {
+<<<<<<< HEAD
       xpos = firstLineIndent + lineStartPaintShift;
       if (effectiveAlignment == CssTextAlign::Right) {
         xpos = effectivePageWidth - contentWidth + lineStartPaintShift;
       } else if (effectiveAlignment == CssTextAlign::Center) {
         xpos = (effectivePageWidth - contentWidth) / 2 + lineStartPaintShift;
+=======
+      xpos = firstLineIndent;
+      if (effectiveAlignment == CssTextAlign::Right) {
+        xpos = effectivePageWidth - contentWidth;
+      } else if (effectiveAlignment == CssTextAlign::Center) {
+        xpos = (effectivePageWidth - contentWidth) / 2;
+>>>>>>> upstream/master
       }
     }
 
@@ -1554,7 +1660,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       // For Right and Justify, start from right edge (xpos = effectivePageWidth)
 
       for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
+<<<<<<< HEAD
         xpos -= lineAdvances[wordIdx];
+=======
+        xpos -= wordWidths[lastBreakAt + wordIdx];
+>>>>>>> upstream/master
         lineXPos.push_back(static_cast<int16_t>(xpos));
 
         const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
@@ -1586,11 +1696,19 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
       }
     } else {
       // LTR: position words from left to right
+<<<<<<< HEAD
       int xpos = firstLineIndent + lineStartPaintShift;
       if (effectiveAlignment == CssTextAlign::Right) {
         xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps + lineStartPaintShift;
       } else if (effectiveAlignment == CssTextAlign::Center) {
         xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2 + lineStartPaintShift;
+=======
+      int xpos = firstLineIndent;
+      if (effectiveAlignment == CssTextAlign::Right) {
+        xpos = effectivePageWidth - lineWordWidthSum - totalNaturalGaps;
+      } else if (effectiveAlignment == CssTextAlign::Center) {
+        xpos = (effectivePageWidth - lineWordWidthSum - totalNaturalGaps) / 2;
+>>>>>>> upstream/master
       }
 
       for (size_t wordIdx = 0; wordIdx < lineWordCount; wordIdx++) {
@@ -1598,7 +1716,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
 
         const bool nextIsContinuation = wordIdx + 1 < lineWordCount && continuesVec[lastBreakAt + wordIdx + 1];
         if (nextIsContinuation) {
+<<<<<<< HEAD
           int advance = lineAdvances[wordIdx];
+=======
+          int advance = wordWidths[lastBreakAt + wordIdx];
+>>>>>>> upstream/master
           advance += renderer.getKerning(fontId, lastCodepoint(lineWords[wordIdx]),
                                          firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
           // wordIdx > 0 mirrors the gap accounting above (which skips index 0): a leading
@@ -1622,7 +1744,11 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
           if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;
           }
+<<<<<<< HEAD
           xpos += lineAdvances[wordIdx] + gap;
+=======
+          xpos += wordWidths[lastBreakAt + wordIdx] + gap;
+>>>>>>> upstream/master
         }
       }
     }
