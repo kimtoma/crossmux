@@ -45,8 +45,8 @@
 - `src/reading_sync/ReadingSyncPolicy.h/.cpp` — qualifying, fingerprint, HTTP/sequence 결과 정책. 네트워크·파일 의존성 없음.
 - `src/reading_sync/ReadingSyncQueue.h/.cpp` — `/.crosspoint/reading_sync/queue.json` 원자 저장, coalescing, sequence 복구.
 - `src/reading_sync/ReadingSyncCredentialStore.h/.cpp` — 토큰 난독화 저장과 masked 상태.
-- `src/reading_sync/EpubCoverSource.h/.cpp` — EPUB 원본 JPG/PNG를 임시 파일로 1KB 스트리밍하고 SHA-256 계산.
-- `src/reading_sync/ReadingSyncClient.h/.cpp` — sync/validate/cover API와 HTTP 상태 매핑.
+- `src/reading_sync/EpubOriginalCoverSource.h/.cpp` — EPUB 원본 JPG/PNG를 임시 파일로 1KB 스트리밍하고 SHA-256 계산.
+- `src/reading_sync/ReadingSyncClient.h/.cpp` — Wi-Fi 수명주기, sync/validate/cover API, HTTP 상태 매핑, 항상 연결 종료.
 - `src/reading_sync/ReadingSyncResponseValidation.h/.cpp` — ArduinoJson과 분리된 네 필드 응답 의미 검증.
 - `src/reading_sync/ReadingSyncCoordinator.h/.cpp` — 홈 화면 one-shot 작업, Wi-Fi 수명주기, 취소, queue 적용.
 - `test/cjk_source_spacing/*` — source whitespace 순수 판정 native test.
@@ -833,8 +833,8 @@ git commit -m "feat(sync): persist reading queue and device token"
 **Files:**
 - Modify: `lib/Epub/Epub.h`
 - Modify: `lib/Epub/Epub.cpp`
-- Create: `src/reading_sync/EpubCoverSource.h`
-- Create: `src/reading_sync/EpubCoverSource.cpp`
+- Create: `src/reading_sync/EpubOriginalCoverSource.h`
+- Create: `src/reading_sync/EpubOriginalCoverSource.cpp`
 - Create: `test/reading_sync/EpubCoverPolicyTest.cpp`
 - Modify: `test/reading_sync/CMakeLists.txt`
 
@@ -848,7 +848,7 @@ Create `EpubCoverPolicyTest.cpp`:
 
 ```cpp
 #include <gtest/gtest.h>
-#include "reading_sync/EpubCoverSource.h"
+#include "reading_sync/EpubOriginalCoverSource.h"
 
 TEST(EpubCoverPolicy, AcceptsOnlyJpegAndPngMagic) {
   const uint8_t jpg[] = {0xff, 0xd8, 0xff, 0xe0};
@@ -873,7 +873,7 @@ Add the test file to `reading_sync_tests` in its CMake file.
 
 Run: `cmake -S test -B build/test && cmake --build build/test --target reading_sync_tests`
 
-Expected: FAIL because `EpubCoverSource.h` is absent.
+Expected: FAIL because `EpubOriginalCoverSource.h` is absent.
 
 - [ ] **Step 3: Implement bounded original-cover staging**
 
@@ -885,7 +885,7 @@ const std::string& getOriginalCoverItemHref() const;
 
 and implement it by returning `bookMetadataCache->coreMetadata.coverItemHref` when loaded, otherwise a static empty string.
 
-Create `EpubCoverSource.h`:
+Create `EpubOriginalCoverSource.h`:
 
 ```cpp
 #pragma once
@@ -909,7 +909,7 @@ inline std::string detectReadingCoverMime(const uint8_t* prefix, const size_t si
 bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, ReadingCoverJob& out);
 ```
 
-Add `<algorithm>` and `<iterator>` includes to the header so the inline pure helpers compile in the host test. Keep all Epub/Hal/mbedTLS work in `EpubCoverSource.cpp`; native tests never link the device-only staging function.
+Add `<algorithm>` and `<iterator>` includes to the header so the inline pure helpers compile in the host test. Keep all Epub/Hal/mbedTLS work in `EpubOriginalCoverSource.cpp`; native tests never link the device-only staging function.
 
 The implementation must use a `Print` sink that writes each incoming chunk to `/.crosspoint/reading_sync/covers/.tmp`, updates `mbedtls_sha256_context`, captures the first eight bytes, and rejects total bytes over 2,097,152. Call `epub.readItemContentsToStream(href, sink, 1024)` once. After close, validate actual count, magic, and `epub.getItemSize()` agreement; compute 64 lowercase hex characters; rename to `/.crosspoint/reading_sync/covers/{sha256}.jpg` or `.png`; fill `bookId`, `sha256`, `mime`, `path`. Remove `.tmp` on every failure. Never use `getCoverBmpPath()`.
 
@@ -928,7 +928,7 @@ Expected: policy tests pass and simulator builds. Open one JPG-cover EPUB, one P
 - [ ] **Step 5: Commit cover streaming**
 
 ```bash
-git add lib/Epub/Epub.h lib/Epub/Epub.cpp src/reading_sync/EpubCoverSource.h src/reading_sync/EpubCoverSource.cpp test/reading_sync
+git add lib/Epub/Epub.h lib/Epub/Epub.cpp src/reading_sync/EpubOriginalCoverSource.h src/reading_sync/EpubOriginalCoverSource.cpp test/reading_sync
 git commit -m "feat(sync): stage original EPUB covers"
 ```
 
@@ -1085,6 +1085,8 @@ Create `ReadingSyncClient.h` with:
 
 ```cpp
 #include "ReadingSyncResponseValidation.h"
+class ReadingSyncQueue;
+class ReadingSyncCredentialStore;
 
 class ReadingSyncClient {
  public:
@@ -1094,7 +1096,10 @@ class ReadingSyncClient {
                                   ReadingSyncResponse& response, bool* cancelFlag);
   HttpDownloader::HttpResult uploadCover(const ReadingCoverJob& cover, const std::string& token,
                                          bool* cancelFlag);
+  void performPendingSync(ReadingSyncQueue& queue, ReadingSyncCredentialStore& credentials,
+                          bool* cancelFlag);
 };
+#define READING_SYNC_CLIENT ReadingSyncClient::getInstance()
 ```
 
 Serialize metadata into a `StaticJsonDocument<8192>` and reject an output of 8192B or more. Use exactly:
@@ -1105,7 +1110,7 @@ POST https://api.kimtoma.com/v1/reading/sync?validateOnly=1
 PUT  https://api.kimtoma.com/v1/reading/books/{url-encoded-bookId}/cover
 ```
 
-In `ReadingSyncClient.cpp`, deserialize the response stream with ArduinoJson into `ReadingSyncWireResponse`, setting each `has*` flag from `JsonVariant::is<T>()`, then call `validateReadingSyncResponse`. This keeps malformed/missing fields distinct from zero/false and keeps the semantic validator host-testable.
+In `ReadingSyncClient.cpp`, deserialize the response stream with ArduinoJson into `ReadingSyncWireResponse`, setting each `has*` flag from `JsonVariant::is<T>()`, then call `validateReadingSyncResponse`. This keeps malformed/missing fields distinct from zero/false and keeps the semantic validator host-testable. `performPendingSync` owns saved-Wi-Fi connection, the 8-second connect limit, ReadingStats network-memory release/reload, metadata/cover requests, queue disposition, complete HTTP/file closure, `WiFi.disconnect(false)`, `WIFI_OFF`, and `esp_wifi_deinit()` on every exit.
 
 - [ ] **Step 4: Verify policy and both builds**
 
@@ -1181,7 +1186,6 @@ class ReadingSyncCoordinator {
   bool isRunning() const;
  private:
   static void taskEntry(void* context);
-  void runOneShot();
   std::atomic_bool cancelRequested_{false};
   std::atomic_bool manualRetryRequested_{false};
   std::atomic_bool running_{false};
@@ -1193,7 +1197,7 @@ class ReadingSyncCoordinator {
 
 `enqueueAfterSession` returns without mutation unless qualifying, resolves the content ID with `BookIdentity::resolveStableBookId()`, replaces a `legacy:` fallback with lowercase SHA-256 so no path leaves the device, fills metadata from `ReadingBookStats`, converts a valid epoch `lastReadAt` to UTC ISO 8601 and otherwise omits it, stages cover while the supplied `Epub` is alive, and calls queue enqueue only after `READING_STATS.endSession()` has completed. It never stores file path or chapter title in metadata.
 
-`startOneShotIfPending` requires pending work, token, unpaused auth, and `running_ == false`; it creates one 4096-byte FreeRTOS task and sets `running_` before creation to prevent duplicates. `requestManualRetry()` clears no queue state; it marks a retry trigger that `HomeActivity::onEnter()` consumes, and if Home is already active it calls `startOneShotIfPending()`. `runOneShot` follows exactly:
+`startOneShotIfPending` requires pending work, token, unpaused auth, and `running_ == false`; it creates one 4096-byte FreeRTOS task and sets `running_` before creation to prevent duplicates. `requestManualRetry()` clears no queue state; it marks a retry trigger that `HomeActivity::onEnter()` consumes, and if Home is already active it calls `startOneShotIfPending()`. The task calls `READING_SYNC_CLIENT.performPendingSync(READING_SYNC_QUEUE, READING_SYNC_CREDENTIALS, &cancelRequested_)`, then clears `running_` and deletes itself. `ReadingSyncClient::performPendingSync` follows exactly:
 
 ```text
 connect saved Wi-Fi for at most 8,000ms
@@ -1279,7 +1283,7 @@ Run: `python3 scripts/verify_ko_release.py`
 
 Expected: FAIL on the first missing route.
 
-- [ ] **Step 2: Implement three exact endpoints**
+- [ ] **Step 2: Implement four exact endpoints**
 
 Register only under `ENABLE_KIMTOMA_READING_SYNC`:
 
