@@ -63,7 +63,11 @@ bool OpdsServerStore::loadFromFile() {
   }
 
   // Fresh install / empty config: prefill the ryOS Books catalog
+#if defined(ENABLE_KOREAN_VERSION)
+  return saveToFile();
+#else
   return seedDefaultServer();
+#endif
 }
 
 bool OpdsServerStore::migrateFromSettings() {

@@ -64,8 +64,10 @@ class EpubReaderActivity final : public Activity {
   // Jump to a percentage of the book (0-100), mapping it to spine and page.
   void jumpToPercent(int percent);
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
+#if !defined(ENABLE_KOREAN_VERSION)
   // Opens Cloud Sync, or the credentials hint when username/password are unset.
   void launchKOReaderSync();
+#endif
   void applyOrientation(uint8_t orientation);
   void applyWritingMode(uint8_t writingMode);
   uint8_t effectiveWritingMode() const;

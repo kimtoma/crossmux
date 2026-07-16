@@ -15,7 +15,9 @@ enum class SettingAction {
   None,
   RemapFrontButtons,
   CustomiseStatusBar,
+#if !defined(ENABLE_KOREAN_VERSION)
   KOReaderSync,
+#endif
   OPDSBrowser,
   Network,
   ClearCache,

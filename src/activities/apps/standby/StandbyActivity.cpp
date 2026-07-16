@@ -19,7 +19,9 @@
 #ifdef ENABLE_CHINESE_VERSION
 #include "ChineseCalendarFace.h"
 #endif
+#if !defined(ENABLE_KOREAN_VERSION)
 #include "AirPageFace.h"
+#endif
 #include "CrossPointSettings.h"
 #include "SloppyClockFace.h"
 #include "StandbyTime.h"
@@ -48,9 +50,11 @@ constexpr FaceEntry kFaces[] = {
     {[]() -> std::unique_ptr<StandbyFace> { return makeUniqueNoThrow<ChineseCalendarFace>(); },
      [](int sw, int sh) { return sh > sw; }},  // portrait only
 #endif
-    // AirPage: cloud-rendered image pages. Available in every build; sits after
-    // the Chinese calendar entry when that is compiled in, else after the clock.
+#if !defined(ENABLE_KOREAN_VERSION)
+    // AirPage: cloud-rendered image pages. Sits after the Chinese calendar entry
+    // when that is compiled in, else after the clock.
     {[]() -> std::unique_ptr<StandbyFace> { return makeUniqueNoThrow<AirPageFace>(); }, [](int, int) { return true; }},
+#endif
 };
 constexpr uint8_t kFaceCount = static_cast<uint8_t>(sizeof(kFaces) / sizeof(kFaces[0]));
 
