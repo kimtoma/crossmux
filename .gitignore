@@ -25,3 +25,6 @@ weread_apikey*.bin
 
 # GenSen OTF source used to regenerate CN builtin fonts (large, licensed OFL)
 lib/EpdFont/builtinFonts/source/
+
+# Isolated Codex implementation worktrees
+/.worktrees/
