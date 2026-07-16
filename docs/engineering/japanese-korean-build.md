@@ -53,7 +53,7 @@ The 14pt pool unions Joyo so MEDIUM stays a strict superset of the minimal set
 Full Hangul is embedded only at 14pt (the default `FONT_SIZE::MEDIUM`) so the
 dual-OTA `0x640000` app slot fits. UI sizes 8/10/12 additionally embed the
 KS X 1001 완성형 2 350 common-syllable set (`chars_ko_ks1001_2350.txt`) so
-file-browser and book-list entries render arbitrary Korean titles; 16/18
+file-browser and book-list entries render common Korean titles; 16/18
 stay i18n-only but still cover every `korean.yaml` UI glyph.
 Obsolete / ancient Hangul jamo are **not**
 embedded. Hangul syllables are listed in `chars_ko_hangul_all.txt` and fed via
@@ -119,7 +119,7 @@ Use **separate build directories** per SKU — `gen_i18n.py` writes shared
 | `lib/EpdFont/scripts/chars_ko_hangul_all.txt` | All 11 172 modern Hangul syllables |
 | `lib/EpdFont/scripts/chars_ko_hanja_1800.txt` | 한문 교육용 기초 한자 1800 |
 | `lib/EpdFont/scripts/chars_ko_jamo.txt` | Modern combining + compatibility jamo (no obsolete) |
-| `lib/EpdFont/scripts/build_ko_charset.py` | Emits `ko_common_chars.txt` / `ko_i18n_chars.txt` |
+| `lib/EpdFont/scripts/build_ko_charset.py` | Emits `ko_common_chars.txt` / `ko_ui_chars.txt` / `ko_i18n_chars.txt` |
 | `lib/EpdFont/scripts/build-ko-builtin-fonts.sh` | RHR KR → `notosans_ko_*.h` |
 | `lib/I18n/translations/japanese.yaml` | JA UI (`_locale: ja-JP`) |
 | `lib/I18n/translations/korean.yaml` | KO UI (`_locale: ko-KR`) |

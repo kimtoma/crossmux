@@ -38,8 +38,14 @@ def ui_codepoints() -> set[int]:
 class KoreanCharsetTest(unittest.TestCase):
     def test_ks_x_1001_pool_is_exact(self):
         chars = codepoints(KS)
-        self.assertEqual(2350, len(chars))
-        self.assertTrue(all(0xAC00 <= cp <= 0xD7A3 for cp in chars))
+        expected = set()
+        for lead in range(0xB0, 0xC9):
+            for tail in range(0xA1, 0xFF):
+                char = bytes((lead, tail)).decode("euc_kr", errors="strict")
+                self.assertEqual(1, len(char), f"{lead:02X}{tail:02X}")
+                expected.add(ord(char))
+        self.assertEqual(2350, len(expected))
+        self.assertSetEqual(expected, chars)
 
     def test_small_sizes_cover_pool_and_ui(self):
         required = codepoints(KS) | ui_codepoints()
