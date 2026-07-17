@@ -14,15 +14,22 @@ struct ReadingCoverJob {
 };
 
 enum class ReadingSyncFingerprintState : uint8_t { New, Pending, Accepted };
-enum class ReadingSyncCoverAction : uint8_t { Preserve, MergeIntoPending, Replace };
+enum class ReadingSyncCoverAction : uint8_t { Preserve, MergeIntoPending, RegisterCoverOnly, Replace };
 
 inline ReadingSyncCoverAction classifyReadingSyncCoverAction(const ReadingSyncFingerprintState fingerprintState,
                                                              const bool hasIncomingCover) {
-  if (!hasIncomingCover || fingerprintState == ReadingSyncFingerprintState::Accepted) {
+  if (!hasIncomingCover) {
     return ReadingSyncCoverAction::Preserve;
   }
-  return fingerprintState == ReadingSyncFingerprintState::Pending ? ReadingSyncCoverAction::MergeIntoPending
-                                                                  : ReadingSyncCoverAction::Replace;
+  switch (fingerprintState) {
+    case ReadingSyncFingerprintState::New:
+      return ReadingSyncCoverAction::Replace;
+    case ReadingSyncFingerprintState::Pending:
+      return ReadingSyncCoverAction::MergeIntoPending;
+    case ReadingSyncFingerprintState::Accepted:
+      return ReadingSyncCoverAction::RegisterCoverOnly;
+  }
+  return ReadingSyncCoverAction::Preserve;
 }
 
 inline bool isReadingCoverJobValid(const ReadingCoverJob& cover) {

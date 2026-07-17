@@ -68,15 +68,17 @@ TEST(ReadingSyncQueueCoverJob, MatchesOnlyValidatedBookAndHash) {
   EXPECT_FALSE(matchesReadingCoverJob(unsafe, unsafe.bookId, unsafe.sha256));
 }
 
-TEST(ReadingSyncQueueCoverJob, ClassifiesMergeReplaceAndPreserveActions) {
+TEST(ReadingSyncQueueCoverJob, ClassifiesAcceptedCoverOnlyRegistrationAndPreservation) {
   EXPECT_EQ(ReadingSyncCoverAction::MergeIntoPending,
             classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Pending, true));
   EXPECT_EQ(ReadingSyncCoverAction::Replace, classifyReadingSyncCoverAction(ReadingSyncFingerprintState::New, true));
   EXPECT_EQ(ReadingSyncCoverAction::Preserve,
             classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Pending, false));
   EXPECT_EQ(ReadingSyncCoverAction::Preserve, classifyReadingSyncCoverAction(ReadingSyncFingerprintState::New, false));
-  EXPECT_EQ(ReadingSyncCoverAction::Preserve,
+  EXPECT_EQ(ReadingSyncCoverAction::RegisterCoverOnly,
             classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Accepted, true));
+  EXPECT_EQ(ReadingSyncCoverAction::Preserve,
+            classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Accepted, false));
 }
 
 TEST(ReadingSyncResponseValidation, RequiresEveryFieldAndMatchingSequence) {

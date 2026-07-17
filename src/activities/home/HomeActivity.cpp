@@ -145,11 +145,12 @@ void HomeActivity::onEnter() {
 }
 
 void HomeActivity::onExit() {
-  Activity::onExit();
-
 #ifdef ENABLE_KIMTOMA_READING_SYNC
   READING_SYNC.requestCancel();
+  READING_SYNC.waitUntilStopped();
 #endif
+  Activity::onExit();
+
   // Free the stored cover buffer if any
   freeCoverBuffer();
 }

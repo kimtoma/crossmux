@@ -18,6 +18,7 @@ class ReadingSyncCoordinator {
   void startOneShotIfPending();
   void requestManualRetry();
   void requestCancel();
+  void waitUntilStopped() const;
   bool isRunning() const;
 
  private:

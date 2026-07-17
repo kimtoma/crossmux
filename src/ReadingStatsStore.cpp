@@ -863,11 +863,11 @@ bool ReadingStatsStore::removeBook(const std::string& path) {
   return true;
 }
 
-void ReadingStatsStore::endSession() {
+bool ReadingStatsStore::endSession() {
   if (!activeSession.active || activeSession.bookIndex >= books.size()) {
     lastSessionSnapshot = {};
     activeSession = {};
-    return;
+    return true;
   }
 
   noteActivity();
@@ -898,7 +898,7 @@ void ReadingStatsStore::endSession() {
   lastSessionSnapshot.endProgressPercent = book.lastProgressPercent;
 
   activeSession = {};
-  saveToFile();
+  return saveToFile();
 }
 
 bool ReadingStatsStore::adjustBookReadingTime(const std::string& path, const uint32_t dayOrdinal,
@@ -1127,7 +1127,10 @@ bool ReadingStatsStore::releaseMemoryForNetwork() {
           heap_caps_get_largest_free_block(MALLOC_CAP_8BIT | MALLOC_CAP_DEFAULT));
 
   if (activeSession.active) {
-    endSession();
+    if (!endSession()) {
+      LOG_ERR("RST", "Failed to end the active session before network memory release");
+      return false;
+    }
   }
 
   if (dirty && !saveToFile()) {

@@ -292,15 +292,18 @@ void EpubReaderActivity::onExit() {
     saveProgress(origin.spineIndex, origin.pageNumber, 0);
   }
 
-  READING_STATS.endSession();
 #ifdef ENABLE_KIMTOMA_READING_SYNC
-  const ReadingSessionSnapshot& snapshot = READING_STATS.getLastSessionSnapshot();
-  if (snapshot.valid && epub) {
-    const ReadingBookStats* book = READING_STATS.findBook(snapshot.bookId);
-    if (book != nullptr) {
-      READING_SYNC.enqueueAfterSession(snapshot, *book, *epub);
+  if (READING_STATS.endSession()) {
+    const ReadingSessionSnapshot& snapshot = READING_STATS.getLastSessionSnapshot();
+    if (snapshot.valid && epub) {
+      const ReadingBookStats* book = READING_STATS.findBook(snapshot.bookId);
+      if (book != nullptr) {
+        READING_SYNC.enqueueAfterSession(snapshot, *book, *epub);
+      }
     }
   }
+#else
+  READING_STATS.endSession();
 #endif
   ACHIEVEMENTS.recordSessionEnded(READING_STATS.getLastSessionSnapshot());
   showPendingAchievementPopups(renderer);

@@ -200,6 +200,23 @@ bool ReadingSyncQueue::enqueue(ReadingSyncMetadata metadata, const ReadingCoverJ
       *this = std::move(previous);
       return false;
     }
+    case ReadingSyncCoverAction::RegisterCoverOnly: {
+      if (hasCover_ && cover_.bookId == cover->bookId && cover_.sha256 == cover->sha256 && cover_.mime == cover->mime &&
+          cover_.path == cover->path && !terminal_) {
+        return true;
+      }
+
+      ReadingSyncQueue previous = *this;
+      cover_ = *cover;
+      hasCover_ = true;
+      terminal_ = false;
+      terminalReason_.clear();
+      if (saveAtomic()) {
+        return true;
+      }
+      *this = std::move(previous);
+      return false;
+    }
     case ReadingSyncCoverAction::Replace:
       break;
   }

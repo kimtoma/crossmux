@@ -32,6 +32,7 @@ constexpr size_t SHA256_BYTES = 32;
 constexpr size_t SHA256_HEX_CHARS = SHA256_BYTES * 2;
 constexpr size_t RFC3339_UTC_CHARS = 20;
 constexpr uint32_t READING_SYNC_TASK_STACK_BYTES = 4096;
+constexpr TickType_t WORKER_WAIT_YIELD_TICKS = 1;
 
 std::string digestToLowerHex(const std::array<uint8_t, SHA256_BYTES>& digest) {
   static constexpr char HEX_DIGITS[] = "0123456789abcdef";
@@ -161,23 +162,27 @@ bool ReadingSyncCoordinator::enqueueAfterSession(const ReadingSessionSnapshot& s
 }
 
 void ReadingSyncCoordinator::startOneShotIfPending() {
+  bool expected = false;
+  // Acquire ownership before inspecting queue or credential state. A prior
+  // worker publishes all queue/stats cleanup through its release store.
+  if (!running_.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+    return;
+  }
+
   manualRetryRequested_.exchange(false, std::memory_order_relaxed);
   if (READING_SYNC_QUEUE.isCorrupt() || READING_SYNC_QUEUE.authenticationPaused() ||
       !READING_SYNC_CREDENTIALS.hasToken() ||
       (READING_SYNC_QUEUE.pending() == nullptr && READING_SYNC_QUEUE.coverPending() == nullptr)) {
+    running_.store(false, std::memory_order_release);
     return;
   }
 
-  bool expected = false;
-  if (!running_.compare_exchange_strong(expected, true, std::memory_order_relaxed)) {
-    return;
-  }
   cancelRequested_.store(false, std::memory_order_relaxed);
 
   const BaseType_t created =
       xTaskCreate(&ReadingSyncCoordinator::taskEntry, "ReadingSync", READING_SYNC_TASK_STACK_BYTES, this, 1, nullptr);
   if (created != pdPASS) {
-    running_.store(false, std::memory_order_relaxed);
+    running_.store(false, std::memory_order_release);
     LOG_ERR("RSY", "Could not create reading sync task");
   }
 }
@@ -186,12 +191,20 @@ void ReadingSyncCoordinator::requestManualRetry() { manualRetryRequested_.store(
 
 void ReadingSyncCoordinator::requestCancel() { cancelRequested_.store(true, std::memory_order_relaxed); }
 
-bool ReadingSyncCoordinator::isRunning() const { return running_.load(std::memory_order_relaxed); }
+void ReadingSyncCoordinator::waitUntilStopped() const {
+  // The worker releases running_ only after performPendingSync() returns, so
+  // observing false also observes NetworkLifecycle's stats reload and cleanup.
+  while (running_.load(std::memory_order_acquire)) {
+    vTaskDelay(WORKER_WAIT_YIELD_TICKS);
+  }
+}
+
+bool ReadingSyncCoordinator::isRunning() const { return running_.load(std::memory_order_acquire); }
 
 void ReadingSyncCoordinator::taskEntry(void* context) {
   auto* coordinator = static_cast<ReadingSyncCoordinator*>(context);
   READING_SYNC_CLIENT.performPendingSync(READING_SYNC_QUEUE, READING_SYNC_CREDENTIALS, &coordinator->cancelRequested_);
-  coordinator->running_.store(false, std::memory_order_relaxed);
+  coordinator->running_.store(false, std::memory_order_release);
   vTaskDelete(nullptr);
 }
 
