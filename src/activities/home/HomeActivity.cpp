@@ -16,6 +16,9 @@
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncCoordinator.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -136,11 +139,17 @@ void HomeActivity::onEnter() {
 
   // Trigger first update
   requestUpdate();
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  READING_SYNC.startOneShotIfPending();
+#endif
 }
 
 void HomeActivity::onExit() {
   Activity::onExit();
 
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  READING_SYNC.requestCancel();
+#endif
   // Free the stored cover buffer if any
   freeCoverBuffer();
 }

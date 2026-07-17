@@ -28,4 +28,5 @@ inline std::string detectReadingCoverMime(const uint8_t* prefix, const size_t si
   return {};
 }
 
-bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, ReadingCoverJob& out);
+bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, ReadingCoverJob& out,
+                            bool* createdNewFile = nullptr);

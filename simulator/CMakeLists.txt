@@ -429,7 +429,8 @@ elseif(SIMULATOR_JAPANESE_VERSION)
 elseif(SIMULATOR_KOREAN_VERSION)
     target_compile_definitions(crosspoint_simulator PRIVATE
         ENABLE_KOREAN_VERSION=1
-        ENABLE_CJK_VERSION=1)
+        ENABLE_CJK_VERSION=1
+        ENABLE_KIMTOMA_READING_SYNC=1)
 else()
     target_compile_definitions(crosspoint_simulator PRIVATE
         ENABLE_CHINESE_VERSION=1
@@ -487,4 +488,3 @@ if(EMSCRIPTEN)
         OUTPUT_NAME "crosspoint_simulator_wasm"
         SUFFIX ".js")
 endif()
-

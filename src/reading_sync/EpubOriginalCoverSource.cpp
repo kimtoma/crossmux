@@ -2,8 +2,11 @@
 
 #ifdef CROSSPOINT_EMULATED
 
-bool stageOriginalEpubCover(const Epub&, const std::string&, ReadingCoverJob& out) {
+bool stageOriginalEpubCover(const Epub&, const std::string&, ReadingCoverJob& out, bool* createdNewFile) {
   out = {};
+  if (createdNewFile != nullptr) {
+    *createdNewFile = false;
+  }
   return false;
 }
 
@@ -99,8 +102,11 @@ std::string digestToLowerHex(const std::array<uint8_t, SHA256_BYTES>& digest) {
 }
 }  // namespace
 
-bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, ReadingCoverJob& out) {
+bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, ReadingCoverJob& out, bool* createdNewFile) {
   out = {};
+  if (createdNewFile != nullptr) {
+    *createdNewFile = false;
+  }
   if (!removeTemporaryCover() || bookId.empty()) {
     return false;
   }
@@ -159,6 +165,8 @@ bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, Reading
   } else if (!Storage.rename(COVER_TEMP_PATH, targetPath.c_str())) {
     removeTemporaryCover();
     return false;
+  } else if (createdNewFile != nullptr) {
+    *createdNewFile = true;
   }
 
   out.bookId = bookId;

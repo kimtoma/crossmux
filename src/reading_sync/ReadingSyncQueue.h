@@ -13,6 +13,18 @@ struct ReadingCoverJob {
   std::string path;
 };
 
+enum class ReadingSyncFingerprintState : uint8_t { New, Pending, Accepted };
+enum class ReadingSyncCoverAction : uint8_t { Preserve, MergeIntoPending, Replace };
+
+inline ReadingSyncCoverAction classifyReadingSyncCoverAction(const ReadingSyncFingerprintState fingerprintState,
+                                                             const bool hasIncomingCover) {
+  if (!hasIncomingCover || fingerprintState == ReadingSyncFingerprintState::Accepted) {
+    return ReadingSyncCoverAction::Preserve;
+  }
+  return fingerprintState == ReadingSyncFingerprintState::Pending ? ReadingSyncCoverAction::MergeIntoPending
+                                                                  : ReadingSyncCoverAction::Replace;
+}
+
 inline bool isReadingCoverJobValid(const ReadingCoverJob& cover) {
   static constexpr char COVER_DIRECTORY[] = "/.crosspoint/reading_sync/covers/";
   static constexpr size_t SHA256_HEX_SIZE = 64;

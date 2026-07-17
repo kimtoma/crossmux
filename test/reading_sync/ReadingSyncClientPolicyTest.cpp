@@ -4,6 +4,7 @@
 #include <climits>
 #include <type_traits>
 
+#include "reading_sync/EpubOriginalCoverSource.h"
 #include "reading_sync/ReadingSyncClient.h"
 #include "reading_sync/ReadingSyncQueue.h"
 #include "reading_sync/ReadingSyncResponseValidation.h"
@@ -26,6 +27,8 @@ static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&Readin
                                     ReadingSyncClient&, const ReadingCoverJob&, const std::string&, AtomicCancelFlag>);
 static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,
                                     ReadingSyncQueue&, ReadingSyncCredentialStore&, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<bool, decltype(&stageOriginalEpubCover), const Epub&, const std::string&,
+                                    ReadingCoverJob&, bool*>);
 
 namespace {
 ReadingCoverJob makeValidCoverJob() {
@@ -63,6 +66,17 @@ TEST(ReadingSyncQueueCoverJob, MatchesOnlyValidatedBookAndHash) {
   ReadingCoverJob unsafe = cover;
   unsafe.path = "/books/private.epub";
   EXPECT_FALSE(matchesReadingCoverJob(unsafe, unsafe.bookId, unsafe.sha256));
+}
+
+TEST(ReadingSyncQueueCoverJob, ClassifiesMergeReplaceAndPreserveActions) {
+  EXPECT_EQ(ReadingSyncCoverAction::MergeIntoPending,
+            classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Pending, true));
+  EXPECT_EQ(ReadingSyncCoverAction::Replace, classifyReadingSyncCoverAction(ReadingSyncFingerprintState::New, true));
+  EXPECT_EQ(ReadingSyncCoverAction::Preserve,
+            classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Pending, false));
+  EXPECT_EQ(ReadingSyncCoverAction::Preserve, classifyReadingSyncCoverAction(ReadingSyncFingerprintState::New, false));
+  EXPECT_EQ(ReadingSyncCoverAction::Preserve,
+            classifyReadingSyncCoverAction(ReadingSyncFingerprintState::Accepted, true));
 }
 
 TEST(ReadingSyncResponseValidation, RequiresEveryFieldAndMatchingSequence) {

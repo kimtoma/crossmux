@@ -169,11 +169,39 @@ bool ReadingSyncQueue::enqueue(ReadingSyncMetadata metadata, const ReadingCoverJ
   }
 
   const std::string nextFingerprint = makeReadingFingerprint(metadata);
+  ReadingSyncFingerprintState fingerprintState = ReadingSyncFingerprintState::New;
   if (hasPending_ && nextFingerprint == makeReadingFingerprint(pending_)) {
-    return true;
+    fingerprintState = ReadingSyncFingerprintState::Pending;
+  } else if (nextFingerprint == lastAcceptedFingerprint_) {
+    fingerprintState = ReadingSyncFingerprintState::Accepted;
   }
-  if (nextFingerprint == lastAcceptedFingerprint_) {
-    return true;
+
+  const ReadingSyncCoverAction coverAction = classifyReadingSyncCoverAction(fingerprintState, cover != nullptr);
+  switch (coverAction) {
+    case ReadingSyncCoverAction::Preserve:
+      if (fingerprintState != ReadingSyncFingerprintState::New) {
+        return true;
+      }
+      break;
+    case ReadingSyncCoverAction::MergeIntoPending: {
+      if (hasCover_ && cover_.bookId == cover->bookId && cover_.sha256 == cover->sha256 && cover_.mime == cover->mime &&
+          cover_.path == cover->path && pending_.coverSha256 == cover->sha256 && pending_.coverMime == cover->mime) {
+        return true;
+      }
+
+      ReadingSyncQueue previous = *this;
+      pending_.coverSha256 = cover->sha256;
+      pending_.coverMime = cover->mime;
+      cover_ = *cover;
+      hasCover_ = true;
+      if (saveAtomic()) {
+        return true;
+      }
+      *this = std::move(previous);
+      return false;
+    }
+    case ReadingSyncCoverAction::Replace:
+      break;
   }
   if (nextSequence_ == UINT32_MAX && hasPending_) {
     return false;
@@ -188,7 +216,7 @@ bool ReadingSyncQueue::enqueue(ReadingSyncMetadata metadata, const ReadingCoverJ
   hasPending_ = true;
   terminal_ = false;
   terminalReason_.clear();
-  if (cover != nullptr) {
+  if (coverAction == ReadingSyncCoverAction::Replace) {
     cover_ = *cover;
     hasCover_ = true;
   }

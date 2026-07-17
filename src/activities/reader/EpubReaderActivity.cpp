@@ -36,6 +36,9 @@
 #include "ReaderUtils.h"
 #include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncCoordinator.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/AchievementPopupUtils.h"
@@ -290,6 +293,15 @@ void EpubReaderActivity::onExit() {
   }
 
   READING_STATS.endSession();
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  const ReadingSessionSnapshot& snapshot = READING_STATS.getLastSessionSnapshot();
+  if (snapshot.valid && epub) {
+    const ReadingBookStats* book = READING_STATS.findBook(snapshot.bookId);
+    if (book != nullptr) {
+      READING_SYNC.enqueueAfterSession(snapshot, *book, *epub);
+    }
+  }
+#endif
   ACHIEVEMENTS.recordSessionEnded(READING_STATS.getLastSessionSnapshot());
   showPendingAchievementPopups(renderer);
   section.reset();

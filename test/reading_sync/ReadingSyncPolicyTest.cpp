@@ -1,9 +1,21 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <type_traits>
+
+#include "reading_sync/ReadingSyncClient.h"
+#include "reading_sync/ReadingSyncCoordinator.h"
+#include "reading_sync/ReadingSyncCredentialStore.h"
 #include "reading_sync/ReadingSyncPolicy.h"
 #include "reading_sync/ReadingSyncQueue.h"
 
 static_assert(ReadingSyncQueue::kSchemaVersion == 1);
+static_assert(ReadingSyncCoordinator::kWifiTimeoutMs == 8000);
+static_assert(ReadingSyncCoordinator::kHttpTimeoutMs == 15000);
+static_assert(!std::is_copy_constructible_v<ReadingSyncCoordinator>);
+static_assert(!std::is_copy_assignable_v<ReadingSyncCoordinator>);
+static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,
+                                    ReadingSyncQueue&, ReadingSyncCredentialStore&, const std::atomic_bool*>);
 
 TEST(ReadingSyncPolicy, QualifiesAtAnyApprovedThreshold) {
   EXPECT_TRUE(qualifiesForReadingSync({180000, 20, 20, false}));
