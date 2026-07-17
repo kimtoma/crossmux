@@ -10,6 +10,12 @@ MAP = BUILD / "firmware.map"
 HARD_MAX = 6_029_312
 TARGET_MAX = 5_898_240
 FORBIDDEN = ("AirPageFace", "PubSubClient", "KOReaderSyncClient", "KOReaderCredentialStore")
+READING_SYNC_ROUTES = (
+    "/api/reading-sync/status",
+    "/api/reading-sync/token",
+    "/api/reading-sync/test",
+    "/api/reading-sync/retry",
+)
 
 
 def fail(message: str) -> None:
@@ -28,6 +34,21 @@ for fragment in (
 ):
     if fragment not in ko:
         fail(f"missing KO source filter {fragment}")
+
+web_server = (ROOT / "src/network/CrossPointWebServer.cpp").read_text(encoding="utf-8")
+settings_page = (ROOT / "src/network/html/SettingsPage.html").read_text(encoding="utf-8")
+for route in READING_SYNC_ROUTES:
+    if route not in web_server:
+        fail(f"missing reading sync route in web server: {route}")
+    if route not in settings_page:
+        fail(f"missing reading sync route in settings page: {route}")
+
+if "tokenObfuscated" in web_server:
+    fail("web server must not access the obfuscated reading sync token")
+if "tokenForRequest()" in settings_page:
+    fail("settings page must not access the reading sync request token")
+if re.search(r"rd1_[A-Za-z0-9_-]{20,}", settings_page):
+    fail("settings page contains a full reading sync token-like literal")
 
 if not BIN.exists() or not MAP.exists():
     fail("build gh_release_ko before verification")

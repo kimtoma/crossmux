@@ -108,6 +108,14 @@ class CrossPointWebServer {
   void handleGetSettings() const;
   void handlePostSettings();
 
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  void handleReadingSyncStatus() const;
+  void handleReadingSyncTokenPost();
+  void handleReadingSyncTokenDelete();
+  void handleReadingSyncTest();
+  void handleReadingSyncRetry();
+#endif
+
   // Font management handlers
   void handleFontsPage() const;
   void handleFontList() const;
