@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>주머니 속 한국어 전자책 리더를 직접 만들었다</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --fg: #1c1c1c;
+  --muted: #6b6b6b;
+  --rule: #e4e4e4;
+  --accent: #00c441;
+  --assistant: #5b6cff;
+  --code-bg: #f0f1f1;
+  --code-fg: #252525;
+  --sans: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --serif: "Iowan Old Style", "Noto Serif KR", "AppleMyungjo", Georgia, serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #101110; --surface: #171817; --fg: #e9e9e6; --muted: #9a9a96; --rule: #30322f; --accent: #39ff14; --assistant: #8c98ff; --code-bg: #202220; --code-fg: #e5e5e2; }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--serif); font-size: 17px; line-height: 1.76; -webkit-font-smoothing: antialiased; }
+.wrap { width: min(100% - 32px, 760px); margin: 0 auto; padding: 56px 0 96px; }
+.eyebrow { color: var(--accent); font: 700 .72rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+h1, h2, h3, h4 { font-family: var(--sans); line-height: 1.28; letter-spacing: -.025em; text-wrap: balance; }
+h1 { margin: 10px 0 14px; font-size: clamp(2rem, 6vw, 3.4rem); }
+h2 { margin: 2.8em 0 .7em; padding-top: .9em; border-top: 1px solid var(--rule); font-size: clamp(1.4rem, 4vw, 1.85rem); }
+h3 { margin: 2em 0 .55em; font-size: 1.18rem; }
+h4 { margin: 1.5em 0 .4em; font-size: 1rem; }
+p { margin: 0 0 1.05em; }
+ul, ol { margin: 0 0 1.2em; padding-left: 1.45em; }
+li { margin: .3em 0; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; }
+blockquote { margin: 1.4em 0; padding: .1em 0 .1em 1.15em; border-left: 3px solid var(--accent); color: var(--muted); }
+code { padding: .14em .38em; border-radius: 5px; background: var(--code-bg); color: var(--code-fg); font-family: var(--mono); font-size: .88em; }
+pre { max-width: 100%; margin: 1.3em 0; padding: 16px; overflow-x: auto; border-radius: 12px; background: var(--code-bg); color: var(--code-fg); line-height: 1.55; }
+pre code { padding: 0; background: transparent; }
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 1.35em 0; border: 1px solid var(--rule); border-radius: 12px; }
+table { width: 100%; min-width: 560px; border-collapse: collapse; font-family: var(--sans); font-size: .9rem; }
+th, td { padding: .72em .85em; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+th { background: var(--code-bg); font-weight: 700; }
+tr:last-child td { border-bottom: 0; }
+hr { margin: 2.8em 0; border: 0; border-top: 1px solid var(--rule); }
+.meta { margin: 0 0 34px; padding: 0 0 22px; border-bottom: 1px solid var(--rule); color: var(--muted); font: 500 .84rem/1.65 var(--sans); }
+.meta span { display: inline-block; margin-right: 14px; }
+.status-note { margin: 24px 0 34px; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--rule)); border-radius: 14px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); font-family: var(--sans); }
+img { max-width: 100%; height: auto; }
+
+@media (max-width: 620px) { body { font-size: 16px; } .wrap { width: min(100% - 24px, 760px); padding-top: 36px; } h1 { font-size: 2rem; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+<div class="eyebrow">kimtoma.com / blog preview</div>
+<h1>주머니 속 한국어 전자책 리더를 직접 만들었다</h1>
+<div class="meta"><span>2026.07.18</span><span>AI 90%</span><span>방향과 승인 판단은 사람, 조사·구현·검증·초안 작성은 AI와 협업.</span></div>
+
+<p>예전에 <a href="/blog/xteink-x4-korean-ebook-guide">Xteink X4에 한글 책을 넣어 읽는 과정</a>을 정리했다. 그때의 목표는 일단 한글 EPUB을 여는 것이었다. 이번에는 한 걸음 더 갔다. 한국어로 오래 읽기 편하고, 책을 덮으면 내가 읽고 있는 책이 자동으로 kimtoma.com에 표시되는 개인용 펌웨어를 만들었다.</p>
+<p>이름은 <strong>CrossMux KR</strong>. 아직 운영용 최종판은 아니다. 실제 기기에 설치하고 서버 인증까지 성공했지만, 내가 정한 메모리 안전 기준을 348바이트 넘지 못해 마지막 릴리스를 멈춘 상태다. 동작하는 것과 안심하고 매일 쓰는 것은 다른 문제라서, 그 작은 차이를 그냥 넘기지 않기로 했다.</p>
+<h2>한글이 보이는 것과 한국어로 읽기 좋은 것은 다르다</h2>
+<p>Xteink X4는 4.3인치 이잉크 화면과 물리 버튼, ESP32-C3를 사용하는 아주 작은 전자책 리더다. 안드로이드 기기처럼 앱을 설치하는 방식이 아니라, 제한된 플래시와 약 380KB의 RAM 안에서 펌웨어가 EPUB 파싱부터 화면 그리기, Wi-Fi, HTTPS까지 모두 처리한다.</p>
+<p>한글 글리프 몇 개를 추가하면 제목과 본문이 보이기 시작한다. 하지만 실제 한국어 책을 오래 읽으려면 다른 문제가 나온다.</p>
+<ul>
+<li>목록에서 작은 글꼴을 쓸 때 제목의 일부가 네모로 보인다.</li>
+<li>EPUB 원문에 있던 띄어쓰기가 CJK 조판 과정에서 사라질 수 있다.</li>
+<li>한글 11,172자를 모든 크기에 넣으면 펌웨어 용량이 빠르게 커진다.</li>
+<li>네트워크 동기화를 추가하면 TLS가 읽기 엔진과 같은 작은 힙을 사용한다.</li>
+</ul>
+<p>그래서 이번 프로젝트의 목표를 “한글 지원”이 아니라 <strong>한국어 장문 독서에 맞춘 제품 구성</strong>으로 다시 정의했다.</p>
+<h2>세 개의 오픈소스 저장소에서 출발했다</h2>
+<p>이 펌웨어의 계보는 세 저장소로 이어진다.</p>
+<ol>
+<li><a href="https://github.com/crosspoint-reader/crosspoint-reader">crosspoint-reader/crosspoint-reader</a> — Xteink용 오픈소스 리더의 원류</li>
+<li><a href="https://github.com/0x1abin/crossmux">0x1abin/crossmux</a> — CrossPoint를 확장한 포크</li>
+<li><a href="https://github.com/ryokun6/crossmux">ryokun6/crossmux</a> — CJK, 세로쓰기, 한국어 빌드, 그레이스케일 렌더링을 발전시킨 포크</li>
+</ol>
+<p>처음에는 포크 하나를 그대로 선택하면 될 것 같았다. 코드를 비교해보니 답은 조금 달랐다. 원류의 안정적인 하드웨어·복구 구조를 기준으로 삼고, <code>ryokun6/crossmux</code>의 한국어 빌드인 <code>gh_release_ko</code>를 출발점으로 쓰되, 내가 사용하지 않는 서비스는 한국어 SKU에서 덜어내는 편이 맞았다.</p>
+<p>게임을 지우면 용량이 크게 줄 것 같았지만, 확인해보니 게임 소스는 이미 모든 빌드에서 제외되어 있었다. 실제로 줄일 수 있었던 것은 AirPage/MQTT, ryOS 전용 클라우드 동기화와 설정, 기본으로 추가되는 ryOS Books 카탈로그였다. 일반 OPDS, 파일 전송, 저장된 Wi-Fi, SD 카드 글꼴, 로컬 독서 통계와 OTA 복구는 남겼다.</p>
+<h2>이번 펌웨어에서 지키기로 한 것</h2>
+<p>한국어 글꼴은 크기별 역할을 나눴다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>크기</th>
+<th>수록 범위</th>
+<th>용도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8·10·12pt</td>
+<td>KS X 1001 공통 한글 2,350자 + UI 문자</td>
+<td>제목, 저자, 목록, 작은 본문</td>
+</tr>
+<tr>
+<td>14pt</td>
+<td>현대 한글 11,172자 + 교육용 기초 한자 1,800자</td>
+<td>기본 본문</td>
+</tr>
+<tr>
+<td>16·18pt</td>
+<td>UI 문자와 현대 자모</td>
+<td>큰 UI</td>
+</tr>
+</tbody></table></div>
+<p>모든 크기에 모든 글자를 넣는 대신, 목록에서 자주 만나는 한국어를 작은 글꼴에 보강하고 기본 본문 크기에 전체 현대 한글을 유지했다. 내장 글꼴은 Resource Han Rounded KR을 사용한다.</p>
+<p>띄어쓰기는 EPUB 파서 쪽을 고쳤다. 중국어처럼 글자 사이 공백이 없어도 자연스러운 CJK와, 공백이 단어 경계인 한국어를 같은 규칙으로 처리하면 안 된다. 소스에 실제 공백이 있으면 보존하고, 한국어 section cache 버전도 올려 이전 파싱 결과가 남지 않게 했다.</p>
+<p>기능을 더하는 기준도 정했다.</p>
+<blockquote>
+<p>네트워크가 실패해도 책은 열려야 하고, 로컬 독서 기록은 먼저 저장되어야 한다.</p>
+</blockquote>
+<p>이 원칙이 이후의 자동 연동 구조를 거의 결정했다.</p>
+<h2>책을 덮으면 웹사이트의 READING이 바뀐다</h2>
+<p>kimtoma.com 홈에는 내가 읽고 있는 책을 표시하는 <code>READING</code> 영역이 있다. 이전에는 마크다운과 코드에 직접 책 정보를 적었다. 책을 바꿀 때마다 수정하고 다시 빌드해야 했고, 홈의 목록 보기와 위젯 보기가 서로 다른 책을 보여주기도 했다.</p>
+<p>CrossMux KR에서는 다음 중 하나를 만족한 독서 세션만 동기화한다.</p>
+<ul>
+<li>3분 이상 읽음</li>
+<li>진행률이 1%p 이상 증가</li>
+<li>책을 완료함</li>
+</ul>
+<p>책을 잠깐 잘못 열었다 닫는 행동은 현재 책을 바꾸지 않는다. 같은 책과 같은 진행률도 다시 보내지 않는다.</p>
+<pre><code class="language-text">책을 덮음
+  → 기존 로컬 독서 통계를 먼저 저장
+  → 최신 상태 한 건을 SD 카드 큐에 저장
+  → 리더와 화면 메모리를 정리
+  → 저장된 Wi-Fi로 HTTPS 요청
+  → Cloudflare Worker가 D1에 현재 책을 기록
+  → kimtoma.com의 목록과 위젯이 같은 상태를 표시
+</code></pre>
+<p>기기는 현재 상태를 <code>api.kimtoma.com</code>으로 보낸다. Cloudflare Worker는 기기 전용 토큰의 hash를 확인하고, D1에는 device·book·event·current를 분리해 저장한다. EPUB 원본 표지가 새로 필요할 때만 JPG나 PNG를 R2에 올린다.</p>
+<p>각 요청에는 SD 카드에 보존되는 <code>sequence</code>가 있다. 같은 요청이 다시 오면 <code>duplicate</code>, 오래된 번호면 <code>stale</code>로 처리한다. 전원이 꺼지거나 응답을 받기 전에 연결이 끊겨도 현재 책이 과거 상태로 되돌아가지 않게 하기 위해서다.</p>
+<p>사이트는 다음 순서로 데이터를 고른다.</p>
+<ol>
+<li>공개 current API</li>
+<li>브라우저가 마지막으로 성공한 값</li>
+<li>빌드에 포함된 공통 기본값</li>
+</ol>
+<p>API가 실패해도 빈칸이나 오류 배너 대신 마지막으로 알던 책이 그대로 남는다. 목록 보기와 위젯 보기는 하나의 <code>ReadingProvider</code>를 공유해서 서로 다른 책을 표시하지 않는다.</p>
+<h2>380KB 안에서 HTTPS를 실행하는 일</h2>
+<p>가장 어려운 부분은 API가 아니라 메모리였다. EPUB 파서, 글꼴 캐시, 표지, 홈 화면과 TLS가 모두 ESP32-C3의 작은 힙을 나눠 쓴다. 데스크톱이나 스마트폰에서는 눈에 띄지 않을 크기의 버퍼가 여기서는 부팅과 재시작을 가르는 차이가 된다.</p>
+<p>동기화 worker가 책을 읽는 객체를 계속 붙잡지 않도록 수명주기를 바꿨다.</p>
+<ol>
+<li>로컬 독서 통계를 저장한다.</li>
+<li>제목·저자·진행률 같은 작은 값만 큐에 복사한다.</li>
+<li>EPUB과 렌더러가 소유한 메모리를 해제한다.</li>
+<li>홈 화면이 안정된 뒤 Wi-Fi와 HTTPS를 시작한다.</li>
+<li>성공과 실패에 관계없이 HTTP와 Wi-Fi 자원을 정리한다.</li>
+</ol>
+<p>표지도 RAM에 통째로 올리지 않는다. EPUB 안의 원본 JPG/PNG를 1KB 단위로 SD 카드에 스트리밍하고, 서버가 필요하다고 답할 때만 전송한다.</p>
+<p>기본 TLS 설정만 바꾼다고 실제 펌웨어에 반영되는 것도 아니었다. ESP32 도구 체인이 이미 컴파일한 mbedTLS archive를 링크하고 있었기 때문이다. 빌드에 사용되는 실제 archive를 찾아 수신 버퍼 16KiB, 송신 버퍼 4KiB의 비대칭 설정으로 다시 만들고, 최종 map과 disassembly에서 그 값이 들어갔는지 확인했다.</p>
+<h2>실제 Xteink4에 설치했다</h2>
+<p>최종 진단용 <code>firmware.bin</code>은 약 5.97MB였다. Xteink4의 OTA 슬롯 하드 상한 안에 들어왔고, 한국어 글꼴·독서 동기화·설정 UI·TLS 진단 로그를 함께 포함했다.</p>
+<p><a href="https://crosspointreader.com/#flash-tools">CrossPoint web flasher</a>에서 Xteink X4와 custom firmware를 선택했다. USB 시리얼 장치를 연결하자 partition table 검증, OTA 정보 읽기, firmware 쓰기, boot partition 갱신, 연결 해제가 차례로 끝났다.</p>
+<p>재부팅 후 기기는 저장된 Wi-Fi에 연결했고, 인증 전용 요청에 HTTP 200을 받았다. 요청 뒤에는 네트워크 수명주기 정리 로그도 확인했다. 서버의 현재 책과 sequence는 바뀌지 않았다. 인증 검사는 연결만 확인하고 실제 독서 상태를 갱신하지 않도록 설계했기 때문이다.</p>
+<p>여기까지만 보면 성공이었다.</p>
+<h2>348바이트 때문에 멈췄다</h2>
+<p>이번 릴리스의 최소 여유 힙 기준은 50KiB, 즉 51,200바이트였다. 실제 기기에서 TLS 요청 중 측정한 최저값은 50,852바이트. <strong>348바이트가 부족했다.</strong></p>
+<p>요청이 끝난 뒤 여유 힙은 137,872바이트로 회복됐고 API도 정상 응답했다. 지금 상태로도 한 번의 동기화는 동작한다. 하지만 최소값이 기준 아래라는 사실은 반복 사용, 더 큰 인증서, 다른 책의 메타데이터, 힙 단편화가 겹칠 때 여유가 거의 없다는 뜻이다.</p>
+<p>기준을 49KiB로 낮추면 바로 “통과”라고 말할 수 있다. 그러지 않기로 했다. 이 기준은 결과를 본 뒤 만든 숫자가 아니라 구현 전에 정한 릴리스 게이트다. 작지만 예측하기 어려운 기기일수록, 스스로 만든 기준을 지키는 편이 낫다.</p>
+<p>그래서 현재 Xteink4에는 진단 펌웨어가 설치되어 있고, 운영용 펌웨어 확정은 보류했다.</p>
+<h2>다음 버전에서 할 일</h2>
+<p>남은 작업은 구조를 다시 만드는 일이 아니다.</p>
+<ol>
+<li>1~2KiB의 추가 메모리 여유를 확보한다.</li>
+<li>같은 조건에서 최소 힙이 50KiB를 넘는지 다시 측정한다.</li>
+<li>진단 로그를 제거한 운영용 이미지를 빌드하고 재설치한다.</li>
+<li>실제 책을 3분 이상 읽거나 1%p 넘긴 뒤 닫아 sequence 증가를 확인한다.</li>
+<li>kimtoma.com의 목록과 책 위젯이 동시에 바뀌는지 확인한다.</li>
+</ol>
+<p>이번 작업을 하면서 주머니 속의 작은 리더가 더 흥미로워졌다. 화면에 한글을 띄우는 기기에서, 읽기 경험과 데이터의 흐름을 내가 원하는 방식으로 설계할 수 있는 기기가 됐다.</p>
+<p>아직 마지막 348바이트가 남았다. 다음 글은 그 숫자를 넘긴 운영용 펌웨어 이야기였으면 좋겠다.</p>
+
+</main>
+</body>
+</html>
