@@ -139,6 +139,10 @@ bool ReadingSyncQueue::loadFromFile() {
         }
       }
     }
+
+    if (parsed) {
+      parsed = isReadingSyncQueueStateValid(loaded.terminal_, loaded.hasPending_, loaded.hasCover_);
+    }
   }
 
   if (!parsed) {
@@ -192,9 +196,13 @@ bool ReadingSyncQueue::enqueue(ReadingSyncMetadata metadata, const ReadingCoverJ
   return false;
 }
 
-const ReadingSyncMetadata* ReadingSyncQueue::pending() const { return hasPending_ ? &pending_ : nullptr; }
+const ReadingSyncMetadata* ReadingSyncQueue::pending() const {
+  return !terminal_ && !corrupt_ && hasPending_ ? &pending_ : nullptr;
+}
 
-const ReadingCoverJob* ReadingSyncQueue::coverPending() const { return hasCover_ ? &cover_ : nullptr; }
+const ReadingCoverJob* ReadingSyncQueue::coverPending() const {
+  return !terminal_ && !corrupt_ && hasCover_ ? &cover_ : nullptr;
+}
 
 bool ReadingSyncQueue::applyServerResult(const uint32_t requestSequence, const uint32_t lastAcceptedSequence,
                                          const ReadingSyncServerStatus status, const bool keepCover) {
@@ -207,6 +215,10 @@ bool ReadingSyncQueue::applyServerResult(const uint32_t requestSequence, const u
   if (advanced == 0) {
     terminal_ = true;
     terminalReason_ = "sequence_exhausted";
+    hasPending_ = false;
+    pending_ = {};
+    hasCover_ = false;
+    cover_ = {};
     if (saveAtomic()) {
       return true;
     }

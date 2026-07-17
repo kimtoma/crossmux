@@ -66,3 +66,7 @@ uint32_t advanceReadingSequence(const uint32_t nextSequence, const uint32_t last
   const uint32_t serverNextSequence = lastAcceptedSequence + 1u;
   return nextSequence > serverNextSequence ? nextSequence : serverNextSequence;
 }
+
+bool isReadingSyncQueueStateValid(const bool terminal, const bool hasPending, const bool hasCover) {
+  return !terminal || (!hasPending && !hasCover);
+}

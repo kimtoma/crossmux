@@ -70,3 +70,14 @@ TEST(ReadingSyncPolicy, CoalescingKeepsOnlyNewestFingerprint) {
   sameValue.progressPercent = 21;
   EXPECT_NE(makeReadingFingerprint(oldValue), makeReadingFingerprint(sameValue));
 }
+
+TEST(ReadingSyncPolicy, TerminalQueueCannotRetainPendingWork) {
+  EXPECT_TRUE(isReadingSyncQueueStateValid(false, false, false));
+  EXPECT_TRUE(isReadingSyncQueueStateValid(false, true, false));
+  EXPECT_TRUE(isReadingSyncQueueStateValid(false, false, true));
+  EXPECT_TRUE(isReadingSyncQueueStateValid(false, true, true));
+  EXPECT_TRUE(isReadingSyncQueueStateValid(true, false, false));
+  EXPECT_FALSE(isReadingSyncQueueStateValid(true, true, false));
+  EXPECT_FALSE(isReadingSyncQueueStateValid(true, false, true));
+  EXPECT_FALSE(isReadingSyncQueueStateValid(true, true, true));
+}

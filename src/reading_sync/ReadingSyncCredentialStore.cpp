@@ -2,8 +2,11 @@
 
 #include <ArduinoJson.h>
 #include <HalStorage.h>
+#include <I18n.h>
 #include <Logging.h>
 #include <ObfuscationUtils.h>
+
+#include <cstdio>
 
 namespace {
 constexpr uint8_t CONFIG_SCHEMA_VERSION = 1;
@@ -155,7 +158,12 @@ const std::string& ReadingSyncCredentialStore::tokenForRequest() const { return 
 
 std::string ReadingSyncCredentialStore::maskedStatus() const {
   if (token_.empty()) {
-    return "설정 안 됨";
+    return tr(STR_NOT_SET);
   }
-  return "설정됨 (rd1_…" + token_.substr(token_.size() - 4) + ")";
+
+  char maskedToken[16] = {};
+  std::snprintf(maskedToken, sizeof(maskedToken), "rd1_…%.4s", token_.c_str() + token_.size() - 4);
+  char status[48] = {};
+  std::snprintf(status, sizeof(status), tr(STR_READING_SYNC_TOKEN_SET), maskedToken);
+  return status;
 }
