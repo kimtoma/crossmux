@@ -1,9 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 
-#include "ReadingSyncTypes.h"
+#include "ReadingSyncResponseValidation.h"
 
 struct ReadingCoverJob {
   std::string bookId;
@@ -11,6 +12,41 @@ struct ReadingCoverJob {
   std::string mime;
   std::string path;
 };
+
+inline bool isReadingCoverJobValid(const ReadingCoverJob& cover) {
+  static constexpr char COVER_DIRECTORY[] = "/.crosspoint/reading_sync/covers/";
+  static constexpr size_t SHA256_HEX_SIZE = 64;
+  static constexpr size_t EXTENSION_SIZE = 4;
+
+  if (!isReadingSyncBookIdBounded(cover.bookId) || cover.sha256.size() != SHA256_HEX_SIZE) {
+    return false;
+  }
+  const bool lowercaseHex = std::all_of(cover.sha256.begin(), cover.sha256.end(), [](const char character) {
+    return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f');
+  });
+  if (!lowercaseHex) {
+    return false;
+  }
+
+  const char* extension = nullptr;
+  if (cover.mime == "image/jpeg") {
+    extension = ".jpg";
+  } else if (cover.mime == "image/png") {
+    extension = ".png";
+  } else {
+    return false;
+  }
+
+  constexpr size_t directorySize = sizeof(COVER_DIRECTORY) - 1;
+  return cover.path.size() == directorySize + SHA256_HEX_SIZE + EXTENSION_SIZE &&
+         cover.path.compare(0, directorySize, COVER_DIRECTORY) == 0 &&
+         cover.path.compare(directorySize, SHA256_HEX_SIZE, cover.sha256) == 0 &&
+         cover.path.compare(directorySize + SHA256_HEX_SIZE, EXTENSION_SIZE, extension) == 0;
+}
+
+inline bool matchesReadingCoverJob(const ReadingCoverJob& cover, const std::string& bookId, const std::string& sha256) {
+  return isReadingCoverJobValid(cover) && cover.bookId == bookId && cover.sha256 == sha256;
+}
 
 class ReadingSyncQueue {
  public:
@@ -21,6 +57,7 @@ class ReadingSyncQueue {
   bool enqueue(ReadingSyncMetadata metadata, const ReadingCoverJob* cover);
   const ReadingSyncMetadata* pending() const;
   const ReadingCoverJob* coverPending() const;
+  bool clearCoverJob(const std::string& bookId, const std::string& sha256);
   bool applyServerResult(uint32_t requestSequence, uint32_t lastAcceptedSequence, ReadingSyncServerStatus status,
                          bool keepCover);
   bool dropTerminal(uint32_t requestSequence, const std::string& reason);

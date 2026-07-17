@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "ReadingSyncPolicy.h"
+#include "ReadingSyncResponseValidation.h"
 
 namespace {
 constexpr char QUEUE_DIRECTORY[] = "/.crosspoint/reading_sync";
@@ -118,8 +119,9 @@ bool ReadingSyncQueue::loadFromFile() {
           loaded.pending_.isbn13 = pending["isbn13"] | "";
           loaded.pending_.coverSha256 = pending["coverSha256"] | "";
           loaded.pending_.coverMime = pending["coverMime"] | "";
-          parsed = loaded.pending_.sequence < loaded.nextSequence_ ||
-                   (loaded.pending_.sequence == UINT32_MAX && loaded.nextSequence_ == UINT32_MAX);
+          parsed = isReadingSyncMetadataBounded(loaded.pending_, true) &&
+                   (loaded.pending_.sequence < loaded.nextSequence_ ||
+                    (loaded.pending_.sequence == UINT32_MAX && loaded.nextSequence_ == UINT32_MAX));
         }
       }
     }
@@ -136,6 +138,7 @@ bool ReadingSyncQueue::loadFromFile() {
           loaded.cover_.sha256 = cover["sha256"].as<const char*>();
           loaded.cover_.mime = cover["mime"].as<const char*>();
           loaded.cover_.path = cover["path"].as<const char*>();
+          parsed = isReadingCoverJobValid(loaded.cover_);
         }
       }
     }
@@ -159,8 +162,9 @@ bool ReadingSyncQueue::enqueue(ReadingSyncMetadata metadata, const ReadingCoverJ
   if (corrupt_ || nextSequence_ == 0 || (terminal_ && terminalReason_ == "sequence_exhausted")) {
     return false;
   }
-  if (metadata.schemaVersion != kSchemaVersion || metadata.bookId.empty() || metadata.title.empty() ||
-      metadata.progressPercent > 100) {
+  if (!isReadingSyncMetadataBounded(metadata, false) ||
+      (cover != nullptr && (!isReadingCoverJobValid(*cover) || cover->bookId != metadata.bookId ||
+                            cover->sha256 != metadata.coverSha256 || cover->mime != metadata.coverMime))) {
     return false;
   }
 
@@ -202,6 +206,21 @@ const ReadingSyncMetadata* ReadingSyncQueue::pending() const {
 
 const ReadingCoverJob* ReadingSyncQueue::coverPending() const {
   return !terminal_ && !corrupt_ && hasCover_ ? &cover_ : nullptr;
+}
+
+bool ReadingSyncQueue::clearCoverJob(const std::string& bookId, const std::string& sha256) {
+  if (corrupt_ || !hasCover_ || !matchesReadingCoverJob(cover_, bookId, sha256)) {
+    return false;
+  }
+
+  ReadingSyncQueue previous = *this;
+  hasCover_ = false;
+  cover_ = {};
+  if (saveAtomic()) {
+    return true;
+  }
+  *this = std::move(previous);
+  return false;
 }
 
 bool ReadingSyncQueue::applyServerResult(const uint32_t requestSequence, const uint32_t lastAcceptedSequence,

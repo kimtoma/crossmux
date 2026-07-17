@@ -30,6 +30,11 @@ class HttpDownloader {
     AUTH_FAILED,  // HTTP 401/403 — credentials missing or wrong
   };
 
+  struct HttpResult {
+    DownloadError error = HTTP_ERROR;
+    int statusCode = 0;
+  };
+
   /**
    * Fetch text content from a URL with optional credentials.
    */
@@ -59,4 +64,13 @@ class HttpDownloader {
   // any transport / status failure, or if onResponse returns false.
   static bool postJson(const std::string& url, const std::string& payload, const std::string& bearerToken,
                        const std::function<bool(Stream&)>& onResponse, int timeoutMs = 60000);
+
+  static HttpResult postJsonWithStatus(const std::string& url, const std::string& payload,
+                                       const std::string& bearerToken, const std::function<bool(Stream&)>& onResponse,
+                                       int timeoutMs = 15000, bool* cancelFlag = nullptr);
+
+  static HttpResult putFileWithStatus(const std::string& url, const std::string& path, const std::string& mime,
+                                      const std::string& sha256, const std::string& bearerToken,
+                                      const std::function<bool(Stream&)>& onResponse, int timeoutMs = 15000,
+                                      bool* cancelFlag = nullptr, size_t chunkSize = 1024);
 };
