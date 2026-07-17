@@ -47,7 +47,7 @@ jobs:
           enable-cache: false
 
       - name: Install PlatformIO Core
-        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip "PyYAML>=6.0.3"
 
       # OpenCC tw2sp synthesizes ZH_CN UI strings for gh_release_sc (gen_i18n.py).
       - name: Install OpenCC
@@ -64,3 +64,25 @@ jobs:
         run: |
           set -euo pipefail
           pio run -e gh_release -e gh_release_tc -e gh_release_sc -e gh_release_ja -e gh_release_ko
+
+      - name: Gate Korean release
+        run: |
+          set -euo pipefail
+          (
+            set -euo pipefail
+            python3 -m unittest lib/EpdFont/scripts/test_build_ko_charset.py -v
+            python3 scripts/test_ko_workflow_gates.py -v
+            python3 scripts/test_verify_ko_release.py -v
+            python3 scripts/verify_ko_release.py
+          ) 2>&1 | tee ko-verifier.log
+
+      - name: Upload Korean gate failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ko-sync-gate-failure
+          path: |
+            ko-verifier.log
+            .pio/build/gh_release_ko/firmware.map
+            .pio/build/gh_release_ko/firmware.bin
+          if-no-files-found: warn

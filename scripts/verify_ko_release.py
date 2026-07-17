@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
+import argparse
 from pathlib import Path
 import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD = ROOT / ".pio/build/gh_release_ko"
-BIN = BUILD / "firmware.bin"
-MAP = BUILD / "firmware.map"
+KO_ENVIRONMENTS = ("gh_release_ko", "gh_release_ko_rc")
 HARD_MAX = 6_029_312
 TARGET_MAX = 5_898_240
 FORBIDDEN = ("AirPageFace", "PubSubClient", "KOReaderSyncClient", "KOReaderCredentialStore")
@@ -66,96 +65,165 @@ def extract_function_body(source: str, signature: str) -> str:
 
 
 def is_macro_guarded(source: str, position: int, macro: str) -> bool:
-    stack: list[tuple[str, bool]] = []
+    # Each frame tracks whether the selected branch can be reached when the
+    # target macro is undefined/defined, followed by whether a later elif/else
+    # remains reachable for those two states. Unknown expressions deliberately
+    # keep both paths possible so they cannot create a false positive guard.
+    stack: list[list[bool]] = []
     for line in source[:position].splitlines():
         stripped = line.strip()
         if stripped.startswith("#ifdef ") or stripped.startswith("#ifndef ") or stripped.startswith("#if "):
-            stack.append((stripped, False))
+            can_be_true, can_be_false = condition_possibilities(stripped, macro)
+            stack.append([can_be_true[0], can_be_true[1], can_be_false[0], can_be_false[1]])
         elif stripped.startswith("#else") and stack:
-            condition, _ = stack[-1]
-            stack[-1] = (condition, True)
+            frame = stack[-1]
+            frame[0], frame[1] = frame[2], frame[3]
+            frame[2], frame[3] = False, False
         elif stripped.startswith("#elif") and stack:
-            stack[-1] = (stripped, False)
+            frame = stack[-1]
+            can_be_true, can_be_false = condition_possibilities(stripped, macro)
+            frame[0], frame[1] = frame[2] and can_be_true[0], frame[3] and can_be_true[1]
+            frame[2], frame[3] = frame[2] and can_be_false[0], frame[3] and can_be_false[1]
         elif stripped.startswith("#endif") and stack:
             stack.pop()
-    return any(macro in condition and not in_else for condition, in_else in stack)
+    reachable_without_macro = all(frame[0] for frame in stack)
+    reachable_with_macro = all(frame[1] for frame in stack)
+    return not reachable_without_macro and reachable_with_macro
 
 
-ini = (ROOT / "platformio.ini").read_text(encoding="utf-8")
-ko = ini.split("[env:gh_release_ko]", 1)[1].split("[env:gh_release_ko_rc]", 1)[0]
-for fragment in (
-    "-<activities/apps/standby/AirPageFace.cpp>",
-    "-<activities/apps/standby/AirPageDeviceId.cpp>",
-    "-<activities/settings/KOReaderAuthActivity.cpp>",
-    "-<activities/settings/KOReaderSettingsActivity.cpp>",
-    "-<activities/reader/KOReaderSyncActivity.cpp>",
-):
-    if fragment not in ko:
-        fail(f"missing KO source filter {fragment}")
+def condition_possibilities(directive: str, macro: str) -> tuple[tuple[bool, bool], tuple[bool, bool]]:
+    if directive.startswith("#ifdef "):
+        if directive.split(maxsplit=1)[1] == macro:
+            return (False, True), (True, False)
+        return (True, True), (True, True)
+    if directive.startswith("#ifndef "):
+        if directive.split(maxsplit=1)[1] == macro:
+            return (True, False), (False, True)
+        return (True, True), (True, True)
 
-web_server_path = ROOT / "src/network/CrossPointWebServer.cpp"
-web_header_path = ROOT / "src/network/CrossPointWebServer.h"
-raw_state_path = ROOT / "src/network/ReadingSyncRawRequestState.h"
-web_server = web_server_path.read_text(encoding="utf-8")
-web_header = web_header_path.read_text(encoding="utf-8")
-settings_page = (ROOT / "src/network/html/SettingsPage.html").read_text(encoding="utf-8")
-for route, method, final_handler, raw_handler in READING_SYNC_ROUTES:
-    if route not in web_server:
-        fail(f"missing reading sync route in web server: {route}")
-    if route not in settings_page:
-        fail(f"missing reading sync route in settings page: {route}")
-    registration = extract_call(web_server, f'server->on("{route}", {method}')
-    if final_handler not in registration:
-        fail(f"missing final handler for {method} {route}")
-    if raw_handler is not None and raw_handler not in registration:
-        fail(f"missing raw callback for {method} {route}")
+    expression = directive.split(maxsplit=1)[1].strip()
+    escaped_macro = re.escape(macro)
+    positive = rf"(?:defined\s*\(\s*{escaped_macro}\s*\)|defined\s+{escaped_macro}|{escaped_macro})"
+    if re.fullmatch(positive, expression):
+        return (False, True), (True, False)
+    if re.fullmatch(rf"!\s*{positive}", expression):
+        return (True, False), (False, True)
+    return (True, True), (True, True)
 
-for source_name, source in ((web_server_path.name, web_server), (web_header_path.name, web_header)):
-    for match in re.finditer(r"\bhandleReadingSync[A-Za-z0-9_]*\b", source):
-        if not is_macro_guarded(source, match.start(), "ENABLE_KIMTOMA_READING_SYNC"):
-            fail(f"unguarded reading sync handler in {source_name}: {match.group(0)}")
 
-token_handler = extract_function_body(web_server, "void CrossPointWebServer::handleReadingSyncTokenPost()")
-if 'arg("plain")' in token_handler or re.search(r"\b(?:String|std::string)\b", token_handler):
-    fail("reading sync token handler must parse only the fixed raw buffer")
+def build_directory(environment: str) -> Path:
+    if environment not in KO_ENVIRONMENTS:
+        raise ValueError(f"unsupported KO environment: {environment}")
+    return ROOT / ".pio" / "build" / environment
 
-for contract in ("RAW_START", "RAW_WRITE", "RAW_END", "RAW_ABORTED"):
-    if contract not in web_server:
-        fail(f"missing raw request lifecycle contract: {contract}")
 
-if not raw_state_path.exists():
-    fail("missing fixed reading sync raw request state")
-raw_state = raw_state_path.read_text(encoding="utf-8")
-for contract in (
-    "kTokenBodyCapacity = 256",
-    "std::array<char, kTokenBodyCapacity + 1>",
-    "overflowed()",
-    "complete()",
-):
-    if contract not in raw_state:
-        fail(f"missing bounded raw state contract: {contract}")
-if re.search(r"\b(?:String|std::string|std::vector)\b", raw_state):
-    fail("raw request state must not use dynamically sized body storage")
+def format_success(environment: str, size: int, headroom: int, target: str) -> str:
+    if environment == "gh_release_ko":
+        return f"OK size={size} headroom={headroom} target={target}"
+    return f"OK environment={environment} size={size} headroom={headroom} target={target}"
 
-if "tokenObfuscated" in web_server:
-    fail("web server must not access the obfuscated reading sync token")
-if "tokenForRequest()" in settings_page:
-    fail("settings page must not access the reading sync request token")
-if re.search(r"rd1_[A-Za-z0-9_-]{20,}", settings_page):
-    fail("settings page contains a full reading sync token-like literal")
 
-if not BIN.exists() or not MAP.exists():
-    fail("build gh_release_ko before verification")
+def environment_section(ini: str, environment: str) -> str:
+    marker = f"[env:{environment}]"
+    start = ini.find(marker)
+    if start < 0:
+        fail(f"missing PlatformIO environment: {environment}")
+    following = re.search(r"^\[env:[^]]+\]", ini[start + len(marker) :], re.MULTILINE)
+    end = start + len(marker) + following.start() if following else len(ini)
+    return ini[start:end]
 
-size = BIN.stat().st_size
-if size > HARD_MAX:
-    fail(f"firmware {size} exceeds hard maximum {HARD_MAX}")
 
-map_text = MAP.read_text(encoding="utf-8", errors="ignore")
-linked = [symbol for symbol in FORBIDDEN if re.search(rf"\b{re.escape(symbol)}\b", map_text)]
-if linked:
-    fail("forbidden linked symbols: " + ", ".join(linked))
+def verify(environment: str) -> None:
+    build = build_directory(environment)
+    binary = build / "firmware.bin"
+    map_file = build / "firmware.map"
 
-headroom = 6_553_600 - size
-target = "met" if size <= TARGET_MAX else "not-met"
-print(f"OK size={size} headroom={headroom} target={target}")
+    ini = (ROOT / "platformio.ini").read_text(encoding="utf-8")
+    ko = environment_section(ini, environment)
+    for fragment in (
+        "-<activities/apps/standby/AirPageFace.cpp>",
+        "-<activities/apps/standby/AirPageDeviceId.cpp>",
+        "-<activities/settings/KOReaderAuthActivity.cpp>",
+        "-<activities/settings/KOReaderSettingsActivity.cpp>",
+        "-<activities/reader/KOReaderSyncActivity.cpp>",
+    ):
+        if fragment not in ko:
+            fail(f"missing KO source filter {fragment}")
+
+    web_server_path = ROOT / "src/network/CrossPointWebServer.cpp"
+    web_header_path = ROOT / "src/network/CrossPointWebServer.h"
+    raw_state_path = ROOT / "src/network/ReadingSyncRawRequestState.h"
+    web_server = web_server_path.read_text(encoding="utf-8")
+    web_header = web_header_path.read_text(encoding="utf-8")
+    settings_page = (ROOT / "src/network/html/SettingsPage.html").read_text(encoding="utf-8")
+    for route, method, final_handler, raw_handler in READING_SYNC_ROUTES:
+        if route not in web_server:
+            fail(f"missing reading sync route in web server: {route}")
+        if route not in settings_page:
+            fail(f"missing reading sync route in settings page: {route}")
+        registration = extract_call(web_server, f'server->on("{route}", {method}')
+        if final_handler not in registration:
+            fail(f"missing final handler for {method} {route}")
+        if raw_handler is not None and raw_handler not in registration:
+            fail(f"missing raw callback for {method} {route}")
+
+    for source_name, source in ((web_server_path.name, web_server), (web_header_path.name, web_header)):
+        for match in re.finditer(r"\bhandleReadingSync[A-Za-z0-9_]*\b", source):
+            if not is_macro_guarded(source, match.start(), "ENABLE_KIMTOMA_READING_SYNC"):
+                fail(f"unguarded reading sync handler in {source_name}: {match.group(0)}")
+
+    token_handler = extract_function_body(web_server, "void CrossPointWebServer::handleReadingSyncTokenPost()")
+    if 'arg("plain")' in token_handler or re.search(r"\b(?:String|std::string)\b", token_handler):
+        fail("reading sync token handler must parse only the fixed raw buffer")
+
+    for contract in ("RAW_START", "RAW_WRITE", "RAW_END", "RAW_ABORTED"):
+        if contract not in web_server:
+            fail(f"missing raw request lifecycle contract: {contract}")
+
+    if not raw_state_path.exists():
+        fail("missing fixed reading sync raw request state")
+    raw_state = raw_state_path.read_text(encoding="utf-8")
+    for contract in (
+        "kTokenBodyCapacity = 256",
+        "std::array<char, kTokenBodyCapacity + 1>",
+        "overflowed()",
+        "complete()",
+    ):
+        if contract not in raw_state:
+            fail(f"missing bounded raw state contract: {contract}")
+    if re.search(r"\b(?:String|std::string|std::vector)\b", raw_state):
+        fail("raw request state must not use dynamically sized body storage")
+
+    if "tokenObfuscated" in web_server:
+        fail("web server must not access the obfuscated reading sync token")
+    if "tokenForRequest()" in settings_page:
+        fail("settings page must not access the reading sync request token")
+    if re.search(r"rd1_[A-Za-z0-9_-]{20,}", settings_page):
+        fail("settings page contains a full reading sync token-like literal")
+
+    if not binary.exists() or not map_file.exists():
+        fail(f"build {environment} before verification")
+
+    size = binary.stat().st_size
+    if size > HARD_MAX:
+        fail(f"firmware {size} exceeds hard maximum {HARD_MAX}")
+
+    map_text = map_file.read_text(encoding="utf-8", errors="ignore")
+    linked = [symbol for symbol in FORBIDDEN if re.search(rf"\b{re.escape(symbol)}\b", map_text)]
+    if linked:
+        fail("forbidden linked symbols: " + ", ".join(linked))
+
+    headroom = 6_553_600 - size
+    target = "met" if size <= TARGET_MAX else "not-met"
+    print(format_success(environment, size, headroom, target))
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Verify a Korean release firmware build")
+    parser.add_argument("--environment", choices=KO_ENVIRONMENTS, default="gh_release_ko")
+    args = parser.parse_args(argv)
+    verify(args.environment)
+
+
+if __name__ == "__main__":
+    main()
