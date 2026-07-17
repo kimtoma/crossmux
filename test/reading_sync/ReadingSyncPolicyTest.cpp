@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "reading_sync/ReadingSyncPolicy.h"
+#include "reading_sync/ReadingSyncQueue.h"
+
+static_assert(ReadingSyncQueue::kSchemaVersion == 1);
 
 TEST(ReadingSyncPolicy, QualifiesAtAnyApprovedThreshold) {
   EXPECT_TRUE(qualifiesForReadingSync({180000, 20, 20, false}));
@@ -56,4 +59,14 @@ TEST(ReadingSyncPolicy, AdvancesPastServerAndDetectsExhaustion) {
   EXPECT_EQ(43u, advanceReadingSequence(8, 42));
   EXPECT_EQ(8u, advanceReadingSequence(8, 7));
   EXPECT_EQ(0u, advanceReadingSequence(UINT32_MAX, UINT32_MAX));
+}
+
+TEST(ReadingSyncPolicy, CoalescingKeepsOnlyNewestFingerprint) {
+  ReadingSyncMetadata oldValue{1, 10, "book", "제목", "저자", 20, "2026-07-17T00:00:00Z", "", "", ""};
+  ReadingSyncMetadata sameValue = oldValue;
+  sameValue.sequence = 11;
+  sameValue.lastReadAt = "2026-07-17T12:00:00Z";
+  EXPECT_EQ(makeReadingFingerprint(oldValue), makeReadingFingerprint(sameValue));
+  sameValue.progressPercent = 21;
+  EXPECT_NE(makeReadingFingerprint(oldValue), makeReadingFingerprint(sameValue));
 }
