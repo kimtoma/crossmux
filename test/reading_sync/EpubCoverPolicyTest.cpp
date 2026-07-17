@@ -17,3 +17,9 @@ TEST(EpubCoverPolicy, EnforcesInclusiveTwoMegabyteLimit) {
   EXPECT_TRUE(isReadingCoverSizeAllowed(2097152));
   EXPECT_FALSE(isReadingCoverSizeAllowed(2097153));
 }
+
+TEST(EpubCoverPolicy, RequiresPersistedSizeAndSuccessfulClose) {
+  EXPECT_TRUE(isReadingCoverPersistenceComplete(1024, 1024, true));
+  EXPECT_FALSE(isReadingCoverPersistenceComplete(1024, 1023, true));
+  EXPECT_FALSE(isReadingCoverPersistenceComplete(1024, 1024, false));
+}

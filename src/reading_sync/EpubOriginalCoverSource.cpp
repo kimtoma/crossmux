@@ -119,25 +119,28 @@ bool stageOriginalEpubCover(const Epub& epub, const std::string& bookId, Reading
   size_t prefixSize = 0;
   std::array<uint8_t, COVER_PREFIX_BYTES> prefix = {};
   std::array<uint8_t, SHA256_BYTES> digest = {};
+  bool opened = false;
   bool staged = false;
   {
     HalFile temporaryCover;
-    if (!Storage.openFileForWrite("RSY", COVER_TEMP_PATH, temporaryCover)) {
-      removeTemporaryCover();
-      return false;
+    opened = Storage.openFileForWrite("RSY", COVER_TEMP_PATH, temporaryCover);
+    if (opened) {
+      OriginalCoverSink sink(temporaryCover);
+      const bool streamAndHashComplete = sink.healthy() &&
+                                         epub.readItemContentsToStream(coverItemHref, sink, COVER_STREAM_CHUNK_SIZE) &&
+                                         sink.finish(digest);
+      temporaryCover.flush();
+      actualSize = sink.bytesWritten();
+      prefixSize = sink.prefixSize();
+      prefix = sink.prefix();
+      const size_t persistedSize = temporaryCover.fileSize();
+      const bool closeSucceeded = temporaryCover.close();
+      staged = streamAndHashComplete && isReadingCoverPersistenceComplete(actualSize, persistedSize, closeSucceeded);
     }
-
-    OriginalCoverSink sink(temporaryCover);
-    staged = sink.healthy() && epub.readItemContentsToStream(coverItemHref, sink, COVER_STREAM_CHUNK_SIZE) &&
-             sink.finish(digest);
-    temporaryCover.flush();
-    actualSize = sink.bytesWritten();
-    prefixSize = sink.prefixSize();
-    prefix = sink.prefix();
   }
 
   const std::string mime = detectReadingCoverMime(prefix.data(), prefixSize);
-  if (!staged || actualSize != declaredSize || !isReadingCoverSizeAllowed(actualSize) || mime.empty()) {
+  if (!opened || !staged || actualSize != declaredSize || !isReadingCoverSizeAllowed(actualSize) || mime.empty()) {
     removeTemporaryCover();
     return false;
   }
