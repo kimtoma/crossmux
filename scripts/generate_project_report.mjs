@@ -160,7 +160,7 @@ function baseStyles(variant) {
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--serif); font-size: 17px; line-height: 1.76; -webkit-font-smoothing: antialiased; }
+body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--fg); font-family: var(--serif); font-size: 17px; line-height: 1.76; -webkit-font-smoothing: antialiased; }
 .wrap { width: min(100% - 32px, 760px); margin: 0 auto; padding: 56px 0 96px; }
 .eyebrow { color: var(--accent); font: 700 .72rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 h1, h2, h3, h4 { font-family: var(--sans); line-height: 1.28; letter-spacing: -.025em; text-wrap: balance; }
