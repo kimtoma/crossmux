@@ -559,6 +559,15 @@ const std::string& Epub::getLanguage() const {
   return bookMetadataCache->coreMetadata.language;
 }
 
+const std::string& Epub::getOriginalCoverItemHref() const {
+  static const std::string blank;
+  if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    return blank;
+  }
+
+  return bookMetadataCache->coreMetadata.coverItemHref;
+}
+
 bool Epub::isPageProgressionRtl() const {
   return bookMetadataCache && bookMetadataCache->isLoaded() && bookMetadataCache->coreMetadata.pageProgressionRtl;
 }

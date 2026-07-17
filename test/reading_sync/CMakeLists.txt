@@ -1,4 +1,5 @@
 add_executable(reading_sync_tests
+  EpubCoverPolicyTest.cpp
   ReadingSyncPolicyTest.cpp
   ${REPO_ROOT}/src/reading_sync/ReadingSyncPolicy.cpp
 )
