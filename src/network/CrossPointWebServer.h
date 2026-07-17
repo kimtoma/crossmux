@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "ReadingSyncRawRequestState.h"
+#endif
+
 // Structure to hold file information
 struct FileInfo {
   String name;
@@ -111,9 +115,13 @@ class CrossPointWebServer {
 #ifdef ENABLE_KIMTOMA_READING_SYNC
   void handleReadingSyncStatus() const;
   void handleReadingSyncTokenPost();
+  void handleReadingSyncTokenRaw();
   void handleReadingSyncTokenDelete();
   void handleReadingSyncTest();
   void handleReadingSyncRetry();
+  void handleReadingSyncDiscardRaw();
+
+  ReadingSyncRawRequestState readingSyncRawRequest_;
 #endif
 
   // Font management handlers

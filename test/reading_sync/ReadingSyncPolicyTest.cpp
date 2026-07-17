@@ -12,6 +12,7 @@
 #include "reading_sync/ReadingSyncCredentialStore.h"
 #include "reading_sync/ReadingSyncPolicy.h"
 #include "reading_sync/ReadingSyncQueue.h"
+#include "network/ReadingSyncRawRequestState.h"
 
 static_assert(ReadingSyncQueue::kSchemaVersion == 1);
 static_assert(ReadingSyncCoordinator::kWifiTimeoutMs == 8000);
@@ -23,6 +24,52 @@ static_assert(
 static_assert(std::is_invocable_r_v<bool, decltype(&ReadingStatsStore::endSession), ReadingStatsStore&>);
 static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,
                                     ReadingSyncQueue&, ReadingSyncCredentialStore&, const std::atomic_bool*>);
+static_assert(ReadingSyncRawRequestState::kTokenBodyCapacity == 256);
+static_assert(sizeof(ReadingSyncRawRequestState::TokenBodyBuffer) == 257);
+
+TEST(ReadingSyncRawRequestState, CapturesBoundedChunksAndCompletes) {
+  ReadingSyncRawRequestState state;
+  constexpr uint8_t first[] = {'{', '"', 't'};
+  constexpr uint8_t second[] = {'o', 'k', 'e', 'n', '"', ':', '"', 'x', '"', '}'};
+
+  state.start();
+  state.append(first, sizeof(first));
+  state.append(second, sizeof(second));
+  state.finish();
+
+  EXPECT_TRUE(state.complete());
+  EXPECT_FALSE(state.overflowed());
+  EXPECT_EQ(sizeof(first) + sizeof(second), state.size());
+  EXPECT_STREQ("{\"token\":\"x\"}", state.data());
+}
+
+TEST(ReadingSyncRawRequestState, MarksOverflowWithoutGrowingBodyStorage) {
+  ReadingSyncRawRequestState state;
+  std::array<uint8_t, ReadingSyncRawRequestState::kTokenBodyCapacity + 1> oversized = {};
+
+  state.start();
+  state.append(oversized.data(), oversized.size());
+  state.finish();
+
+  EXPECT_TRUE(state.complete());
+  EXPECT_TRUE(state.overflowed());
+  EXPECT_EQ(0u, state.size());
+  EXPECT_STREQ("", state.data());
+}
+
+TEST(ReadingSyncRawRequestState, AbortedRequestClearsCapturedBytes) {
+  ReadingSyncRawRequestState state;
+  constexpr uint8_t partial[] = {'s', 'e', 'c', 'r', 'e', 't'};
+
+  state.start();
+  state.append(partial, sizeof(partial));
+  state.abort();
+
+  EXPECT_FALSE(state.complete());
+  EXPECT_TRUE(state.overflowed());
+  EXPECT_EQ(0u, state.size());
+  EXPECT_STREQ("", state.data());
+}
 
 TEST(ReadingSyncPolicy, QualifiesAtAnyApprovedThreshold) {
   EXPECT_TRUE(qualifiesForReadingSync({180000, 20, 20, false}));

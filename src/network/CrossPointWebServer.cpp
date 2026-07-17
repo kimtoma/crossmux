@@ -43,11 +43,29 @@ constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;
 #ifdef ENABLE_KIMTOMA_READING_SYNC
-constexpr size_t READING_SYNC_TOKEN_BODY_MAX_BYTES = 256;
-
 void sendReadingSyncJson(WebServer* server, const int status, const char* body) {
   server->send(status, "application/json", body);
 }
+
+bool rejectUnexpectedReadingSyncBody(WebServer* server) {
+  if (server->clientContentLength() == 0) {
+    return false;
+  }
+  sendReadingSyncJson(server, 422, "{\"error\":\"invalid_request\"}");
+  return true;
+}
+
+class ReadingSyncRawRequestReset {
+ public:
+  explicit ReadingSyncRawRequestReset(ReadingSyncRawRequestState& state) : state_(state) {}
+  ~ReadingSyncRawRequestReset() { state_.start(); }
+
+  ReadingSyncRawRequestReset(const ReadingSyncRawRequestReset&) = delete;
+  ReadingSyncRawRequestReset& operator=(const ReadingSyncRawRequestReset&) = delete;
+
+ private:
+  ReadingSyncRawRequestState& state_;
+};
 #endif
 
 // Static pointer for WebSocket callback (WebSocketsServer requires C-style callback)
@@ -180,10 +198,17 @@ void CrossPointWebServer::begin() {
 
 #ifdef ENABLE_KIMTOMA_READING_SYNC
   server->on("/api/reading-sync/status", HTTP_GET, [this] { handleReadingSyncStatus(); });
-  server->on("/api/reading-sync/token", HTTP_POST, [this] { handleReadingSyncTokenPost(); });
-  server->on("/api/reading-sync/token", HTTP_DELETE, [this] { handleReadingSyncTokenDelete(); });
-  server->on("/api/reading-sync/test", HTTP_POST, [this] { handleReadingSyncTest(); });
-  server->on("/api/reading-sync/retry", HTTP_POST, [this] { handleReadingSyncRetry(); });
+  // The four-argument overload keeps ordinary request bodies on WebServer's
+  // fixed HTTPRaw chunks. Multipart still goes through the framework-wide
+  // _parseForm path before this callback; final handlers reject those bodies.
+  server->on("/api/reading-sync/token", HTTP_POST, [this] { handleReadingSyncTokenPost(); },
+             [this] { handleReadingSyncTokenRaw(); });
+  server->on("/api/reading-sync/token", HTTP_DELETE, [this] { handleReadingSyncTokenDelete(); },
+             [this] { handleReadingSyncDiscardRaw(); });
+  server->on("/api/reading-sync/test", HTTP_POST, [this] { handleReadingSyncTest(); },
+             [this] { handleReadingSyncDiscardRaw(); });
+  server->on("/api/reading-sync/retry", HTTP_POST, [this] { handleReadingSyncRetry(); },
+             [this] { handleReadingSyncDiscardRaw(); });
 #endif
 
   // Font management endpoints
@@ -1341,21 +1366,16 @@ void CrossPointWebServer::handleReadingSyncStatus() const {
 }
 
 void CrossPointWebServer::handleReadingSyncTokenPost() {
+  ReadingSyncRawRequestReset reset(readingSyncRawRequest_);
   if (!server->header("Content-Type").equalsIgnoreCase("application/json") ||
-      server->clientContentLength() > static_cast<int>(READING_SYNC_TOKEN_BODY_MAX_BYTES) ||
-      !server->hasArg("plain")) {
-    sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
-    return;
-  }
-
-  const String body = server->arg("plain");
-  if (body.length() > READING_SYNC_TOKEN_BODY_MAX_BYTES) {
+      !readingSyncRawRequest_.complete() || readingSyncRawRequest_.overflowed()) {
     sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
     return;
   }
 
   JsonDocument document;
-  const DeserializationError error = deserializeJson(document, body);
+  const DeserializationError error =
+      deserializeJson(document, readingSyncRawRequest_.data(), readingSyncRawRequest_.size());
   if (error || document.overflowed() || !document.is<JsonObjectConst>()) {
     sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
     return;
@@ -1380,7 +1400,40 @@ void CrossPointWebServer::handleReadingSyncTokenPost() {
   server->send(204, "application/json", "");
 }
 
+void CrossPointWebServer::handleReadingSyncTokenRaw() {
+  // The fourth callback is also used for multipart uploads. _parseForm owns
+  // those allocations, so never access raw() unless the JSON route selected
+  // WebServer's fixed HTTPRaw parser.
+  if (!server->header("Content-Type").equalsIgnoreCase("application/json")) {
+    return;
+  }
+
+  HTTPRaw& raw = server->raw();
+  switch (raw.status) {
+    case RAW_START:
+      readingSyncRawRequest_.start();
+      break;
+    case RAW_WRITE:
+      readingSyncRawRequest_.append(raw.buf, raw.currentSize);
+      break;
+    case RAW_END:
+      readingSyncRawRequest_.finish();
+      break;
+    case RAW_ABORTED:
+      readingSyncRawRequest_.abort();
+      break;
+  }
+}
+
+void CrossPointWebServer::handleReadingSyncDiscardRaw() {
+  // Selecting the raw callback is the contract: WebServer drains ordinary
+  // bodies through its fixed buffer. This handler deliberately retains none.
+}
+
 void CrossPointWebServer::handleReadingSyncTokenDelete() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
   if (!READING_SYNC_CREDENTIALS.clearToken()) {
     sendReadingSyncJson(server.get(), 500, "{\"error\":\"persistence_failed\"}");
     return;
@@ -1395,6 +1448,9 @@ void CrossPointWebServer::handleReadingSyncTokenDelete() {
 }
 
 void CrossPointWebServer::handleReadingSyncTest() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
   if (!READING_SYNC_CREDENTIALS.hasToken()) {
     sendReadingSyncJson(server.get(), 401, "{\"ok\":false,\"error\":\"authentication_failed\"}");
     return;
@@ -1416,6 +1472,9 @@ void CrossPointWebServer::handleReadingSyncTest() {
 }
 
 void CrossPointWebServer::handleReadingSyncRetry() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
   READING_SYNC.requestManualRetry();
   sendReadingSyncJson(server.get(), 202, "{\"scheduled\":true}");
 }
