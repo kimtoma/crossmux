@@ -1,6 +1,7 @@
 #include "HttpDownloader.h"
 
 #include <Arduino.h>
+#include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <Stream.h>
@@ -156,9 +157,13 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
 // setTimeout(0) makes Stream::timedRead bail immediately on -1 (our
 // "no more data" code), so ArduinoJson stops as soon as it has parsed the
 // closing token rather than spending the default 1s waiting for more input.
+bool isCancelled(const std::atomic_bool* cancelFlag) {
+  return cancelFlag != nullptr && cancelFlag->load(std::memory_order_relaxed);
+}
+
 class EspHttpReadStream final : public Stream {
  public:
-  EspHttpReadStream(esp_http_client_handle_t client, bool* cancelFlag)
+  EspHttpReadStream(esp_http_client_handle_t client, const std::atomic_bool* cancelFlag)
       : client_(client), cancelFlag_(cancelFlag), buf_(makeUniqueNoThrow<char[]>(kBufSize)) {
     // The 1 KiB response buffer cannot safely live on the 4 KiB network task
     // stack. Allocate it once for this cold request path and release via RAII.
@@ -190,7 +195,7 @@ class EspHttpReadStream final : public Stream {
   static constexpr size_t kBufSize = 1024;
 
   bool refill() {
-    if (!buf_ || (cancelFlag_ != nullptr && *cancelFlag_)) {
+    if (!buf_ || isCancelled(cancelFlag_)) {
       error_ = buf_ ? HttpDownloader::ABORTED : HttpDownloader::HTTP_ERROR;
       return false;
     }
@@ -207,7 +212,7 @@ class EspHttpReadStream final : public Stream {
   }
 
   esp_http_client_handle_t client_;
-  bool* cancelFlag_ = nullptr;
+  const std::atomic_bool* cancelFlag_ = nullptr;
   std::unique_ptr<char[]> buf_;
   size_t pos_ = 0;
   size_t len_ = 0;
@@ -230,8 +235,6 @@ class HttpClientCleanup final {
   esp_http_client_handle_t client_;
 };
 
-bool isCancelled(const bool* cancelFlag) { return cancelFlag != nullptr && *cancelFlag; }
-
 void setBearerHeader(const esp_http_client_handle_t client, const std::string& bearerToken) {
   if (bearerToken.empty()) {
     return;
@@ -246,7 +249,8 @@ void setBearerHeader(const esp_http_client_handle_t client, const std::string& b
 }
 
 HttpDownloader::HttpResult consumeResponse(const esp_http_client_handle_t client, const int statusCode,
-                                           const std::function<bool(Stream&)>& onResponse, bool* cancelFlag) {
+                                           const std::function<bool(Stream&)>& onResponse,
+                                           const std::atomic_bool* cancelFlag) {
   if (isCancelled(cancelFlag)) {
     return {HttpDownloader::ABORTED, statusCode};
   }
@@ -273,7 +277,7 @@ HttpDownloader::HttpResult consumeResponse(const esp_http_client_handle_t client
 
 HttpDownloader::HttpResult runPostJson(const std::string& url, const std::string& payload,
                                        const std::string& bearerToken, const std::function<bool(Stream&)>& onResponse,
-                                       const int timeoutMs, bool* cancelFlag) {
+                                       const int timeoutMs, const std::atomic_bool* cancelFlag) {
   if (isCancelled(cancelFlag)) {
     return {HttpDownloader::ABORTED, 0};
   }
@@ -347,7 +351,7 @@ HttpDownloader::HttpResult runPostJson(const std::string& url, const std::string
 HttpDownloader::HttpResult runPutFile(const std::string& url, const std::string& path, const std::string& mime,
                                       const std::string& sha256, const std::string& bearerToken,
                                       const std::function<bool(Stream&)>& onResponse, const int timeoutMs,
-                                      bool* cancelFlag, const size_t chunkSize) {
+                                      const std::atomic_bool* cancelFlag, const size_t chunkSize) {
   constexpr size_t MAX_UPLOAD_CHUNK = 1024;
   if (isCancelled(cancelFlag)) {
     return {HttpDownloader::ABORTED, 0};
@@ -491,7 +495,7 @@ bool HttpDownloader::postJson(const std::string& url, const std::string& payload
 HttpDownloader::HttpResult HttpDownloader::postJsonWithStatus(const std::string& url, const std::string& payload,
                                                               const std::string& bearerToken,
                                                               const std::function<bool(Stream&)>& onResponse,
-                                                              const int timeoutMs, bool* cancelFlag) {
+                                                              const int timeoutMs, const std::atomic_bool* cancelFlag) {
   return runPostJson(url, payload, bearerToken, onResponse, timeoutMs, cancelFlag);
 }
 
@@ -499,7 +503,7 @@ HttpDownloader::HttpResult HttpDownloader::putFileWithStatus(const std::string& 
                                                              const std::string& mime, const std::string& sha256,
                                                              const std::string& bearerToken,
                                                              const std::function<bool(Stream&)>& onResponse,
-                                                             const int timeoutMs, bool* cancelFlag,
+                                                             const int timeoutMs, const std::atomic_bool* cancelFlag,
                                                              const size_t chunkSize) {
   return runPutFile(url, path, mime, sha256, bearerToken, onResponse, timeoutMs, cancelFlag, chunkSize);
 }

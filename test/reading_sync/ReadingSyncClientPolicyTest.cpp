@@ -1,9 +1,31 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <climits>
+#include <type_traits>
 
+#include "reading_sync/ReadingSyncClient.h"
 #include "reading_sync/ReadingSyncQueue.h"
 #include "reading_sync/ReadingSyncResponseValidation.h"
+
+using AtomicCancelFlag = const std::atomic_bool*;
+using ResponseConsumer = const std::function<bool(Stream&)>&;
+
+static_assert(
+    std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&HttpDownloader::postJsonWithStatus), const std::string&,
+                          const std::string&, const std::string&, ResponseConsumer, int, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&HttpDownloader::putFileWithStatus),
+                                    const std::string&, const std::string&, const std::string&, const std::string&,
+                                    const std::string&, ResponseConsumer, int, AtomicCancelFlag, size_t>);
+static_assert(
+    std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&ReadingSyncClient::sync), ReadingSyncClient&,
+                          const ReadingSyncMetadata&, const std::string&, ReadingSyncResponse&, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&ReadingSyncClient::validate),
+                                    ReadingSyncClient&, const std::string&, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&ReadingSyncClient::uploadCover),
+                                    ReadingSyncClient&, const ReadingCoverJob&, const std::string&, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,
+                                    ReadingSyncQueue&, ReadingSyncCredentialStore&, AtomicCancelFlag>);
 
 namespace {
 ReadingCoverJob makeValidCoverJob() {

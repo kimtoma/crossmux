@@ -1,6 +1,7 @@
 #pragma once
-#include <HalStorage.h>
 
+#include <atomic>
+#include <cstddef>
 #include <functional>
 #include <string>
 
@@ -67,10 +68,10 @@ class HttpDownloader {
 
   static HttpResult postJsonWithStatus(const std::string& url, const std::string& payload,
                                        const std::string& bearerToken, const std::function<bool(Stream&)>& onResponse,
-                                       int timeoutMs = 15000, bool* cancelFlag = nullptr);
+                                       int timeoutMs = 15000, const std::atomic_bool* cancelFlag = nullptr);
 
   static HttpResult putFileWithStatus(const std::string& url, const std::string& path, const std::string& mime,
                                       const std::string& sha256, const std::string& bearerToken,
                                       const std::function<bool(Stream&)>& onResponse, int timeoutMs = 15000,
-                                      bool* cancelFlag = nullptr, size_t chunkSize = 1024);
+                                      const std::atomic_bool* cancelFlag = nullptr, size_t chunkSize = 1024);
 };

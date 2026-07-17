@@ -27,7 +27,9 @@ constexpr uint32_t WIFI_TIMEOUT_MS = 8000;
 
 enum class CoverProcessingResult : uint8_t { Cleared, Retained, AuthenticationPaused };
 
-bool isCancelled(const bool* cancelFlag) { return cancelFlag != nullptr && *cancelFlag; }
+bool isCancelled(const std::atomic_bool* cancelFlag) {
+  return cancelFlag != nullptr && cancelFlag->load(std::memory_order_relaxed);
+}
 
 class NetworkLifecycle final {
  public:
@@ -53,7 +55,7 @@ class NetworkLifecycle final {
   bool statsReleased_ = false;
 };
 
-bool connectSavedWifi(bool* cancelFlag) {
+bool connectSavedWifi(const std::atomic_bool* cancelFlag) {
   if (WIFI_STORE.getCredentials().empty()) {
     WIFI_STORE.loadFromFile();
   }
@@ -230,7 +232,7 @@ bool clearCoverAndFile(ReadingSyncQueue& queue, const ReadingCoverJob& cover) {
 }
 
 CoverProcessingResult processCoverJob(ReadingSyncClient& client, ReadingSyncQueue& queue, const std::string& token,
-                                      bool* cancelFlag) {
+                                      const std::atomic_bool* cancelFlag) {
   const ReadingCoverJob* pendingCover = queue.coverPending();
   if (pendingCover == nullptr) {
     return CoverProcessingResult::Cleared;
@@ -287,7 +289,7 @@ ReadingSyncClient& ReadingSyncClient::getInstance() {
   return instance;
 }
 
-HttpDownloader::HttpResult ReadingSyncClient::validate(const std::string& token, bool* cancelFlag) {
+HttpDownloader::HttpResult ReadingSyncClient::validate(const std::string& token, const std::atomic_bool* cancelFlag) {
   const std::string emptyJson = "{}";
   return HttpDownloader::postJsonWithStatus(
       VALIDATE_URL, emptyJson, token, [](Stream& stream) { return parseAuthenticationResponse(stream); },
@@ -295,7 +297,7 @@ HttpDownloader::HttpResult ReadingSyncClient::validate(const std::string& token,
 }
 
 HttpDownloader::HttpResult ReadingSyncClient::sync(const ReadingSyncMetadata& metadata, const std::string& token,
-                                                   ReadingSyncResponse& response, bool* cancelFlag) {
+                                                   ReadingSyncResponse& response, const std::atomic_bool* cancelFlag) {
   std::string payload;
   if (!serializeMetadata(metadata, payload)) {
     return {HttpDownloader::HTTP_ERROR, 0};
@@ -310,7 +312,7 @@ HttpDownloader::HttpResult ReadingSyncClient::sync(const ReadingSyncMetadata& me
 }
 
 HttpDownloader::HttpResult ReadingSyncClient::uploadCover(const ReadingCoverJob& cover, const std::string& token,
-                                                          bool* cancelFlag) {
+                                                          const std::atomic_bool* cancelFlag) {
   if (!isReadingCoverJobValid(cover)) {
     return {HttpDownloader::FILE_ERROR, 0};
   }
@@ -325,7 +327,7 @@ HttpDownloader::HttpResult ReadingSyncClient::uploadCover(const ReadingCoverJob&
 }
 
 void ReadingSyncClient::performPendingSync(ReadingSyncQueue& queue, ReadingSyncCredentialStore& credentials,
-                                           bool* cancelFlag) {
+                                           const std::atomic_bool* cancelFlag) {
   if (isCancelled(cancelFlag) || queue.isCorrupt() || queue.authenticationPaused() || !credentials.hasToken() ||
       (queue.pending() == nullptr && queue.coverPending() == nullptr)) {
     return;
