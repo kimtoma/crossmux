@@ -6,6 +6,8 @@
 namespace standby_time {
 namespace {
 
+constexpr time_t kValidSystemClockThreshold = 1704067200;  // 2024-01-01 UTC
+
 bool g_synced =
 #ifdef CROSSPOINT_EMULATED
     true;  // Host system time is already correct; skip Wi-Fi/NTP entirely.
@@ -21,12 +23,12 @@ constexpr unsigned kFallbackStartMM = 38;
 
 }  // namespace
 
-bool isSynced() { return g_synced; }
+bool isSynced() { return g_synced || time(nullptr) >= kValidSystemClockThreshold; }
 
 void setSynced(bool v) { g_synced = v; }
 
 void getNowHHMM(uint32_t fallbackStartMs, unsigned& hh, unsigned& mm) {
-  if (g_synced) {
+  if (isSynced()) {
     const time_t now = time(nullptr);
     struct tm tmLocal;
     localtime_r(&now, &tmLocal);
@@ -41,7 +43,7 @@ void getNowHHMM(uint32_t fallbackStartMs, unsigned& hh, unsigned& mm) {
 }
 
 uint32_t getMinuteTick(uint32_t fallbackStartMs) {
-  if (g_synced) {
+  if (isSynced()) {
     const time_t now = time(nullptr);
     return static_cast<uint32_t>(now / 60);
   }
