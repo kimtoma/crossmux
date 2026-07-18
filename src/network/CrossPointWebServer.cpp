@@ -201,14 +201,18 @@ void CrossPointWebServer::begin() {
   // The four-argument overload keeps ordinary request bodies on WebServer's
   // fixed HTTPRaw chunks. Multipart still goes through the framework-wide
   // _parseForm path before this callback; final handlers reject those bodies.
-  server->on("/api/reading-sync/token", HTTP_POST, [this] { handleReadingSyncTokenPost(); },
-             [this] { handleReadingSyncTokenRaw(); });
-  server->on("/api/reading-sync/token", HTTP_DELETE, [this] { handleReadingSyncTokenDelete(); },
-             [this] { handleReadingSyncDiscardRaw(); });
-  server->on("/api/reading-sync/test", HTTP_POST, [this] { handleReadingSyncTest(); },
-             [this] { handleReadingSyncDiscardRaw(); });
-  server->on("/api/reading-sync/retry", HTTP_POST, [this] { handleReadingSyncRetry(); },
-             [this] { handleReadingSyncDiscardRaw(); });
+  server->on(
+      "/api/reading-sync/token", HTTP_POST, [this] { handleReadingSyncTokenPost(); },
+      [this] { handleReadingSyncTokenRaw(); });
+  server->on(
+      "/api/reading-sync/token", HTTP_DELETE, [this] { handleReadingSyncTokenDelete(); },
+      [this] { handleReadingSyncDiscardRaw(); });
+  server->on(
+      "/api/reading-sync/test", HTTP_POST, [this] { handleReadingSyncTest(); },
+      [this] { handleReadingSyncDiscardRaw(); });
+  server->on(
+      "/api/reading-sync/retry", HTTP_POST, [this] { handleReadingSyncRetry(); },
+      [this] { handleReadingSyncDiscardRaw(); });
 #endif
 
   // Font management endpoints
@@ -238,8 +242,7 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
 
   // Collect WebDAV headers and register handler
-  const char* requestHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout",
-                                  "Content-Type"};
+  const char* requestHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout", "Content-Type"};
   server->collectHeaders(requestHeaders, 7);
   server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
   LOG_DBG("WEB", "WebDAV handler initialized");
@@ -1367,8 +1370,8 @@ void CrossPointWebServer::handleReadingSyncStatus() const {
 
 void CrossPointWebServer::handleReadingSyncTokenPost() {
   ReadingSyncRawRequestReset reset(readingSyncRawRequest_);
-  if (!server->header("Content-Type").equalsIgnoreCase("application/json") ||
-      !readingSyncRawRequest_.complete() || readingSyncRawRequest_.overflowed()) {
+  if (!server->header("Content-Type").equalsIgnoreCase("application/json") || !readingSyncRawRequest_.complete() ||
+      readingSyncRawRequest_.overflowed()) {
     sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
     return;
   }
@@ -1464,8 +1467,7 @@ void CrossPointWebServer::handleReadingSyncTest() {
   }
   if ((result.statusCode == 401 || result.statusCode == 403) && result.error == HttpDownloader::AUTH_FAILED) {
     READING_SYNC_QUEUE.pauseAuthentication();
-    sendReadingSyncJson(server.get(), result.statusCode,
-                        "{\"ok\":false,\"error\":\"authentication_failed\"}");
+    sendReadingSyncJson(server.get(), result.statusCode, "{\"ok\":false,\"error\":\"authentication_failed\"}");
     return;
   }
   sendReadingSyncJson(server.get(), 503, "{\"ok\":false,\"error\":\"temporarily_unavailable\"}");

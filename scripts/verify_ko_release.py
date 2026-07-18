@@ -49,9 +49,12 @@ def extract_balanced(source: str, opening: int, opening_char: str, closing_char:
 
 
 def extract_call(source: str, marker: str) -> str:
-    start = source.find(marker)
-    if start < 0:
+    marker_pattern = re.escape(marker).replace(r"\ ", r"\s*")
+    marker_pattern = marker_pattern.replace(r"\(", r"\(\s*")
+    match = re.search(marker_pattern, source)
+    if match is None:
         fail(f"missing call contract: {marker}")
+    start = match.start()
     opening = source.find("(", start)
     return extract_balanced(source, opening, "(", ")")
 
@@ -133,6 +136,57 @@ def environment_section(ini: str, environment: str) -> str:
     return ini[start:end]
 
 
+def verify_kimtoma_device_contracts() -> None:
+    korean = (ROOT / "lib/I18n/translations/korean.yaml").read_text(encoding="utf-8")
+    for exact in (
+        'STR_KIMTOMA_BRAND: "@kimtoma"',
+        'STR_KIMTOMA_LIBRARY: "kimtoma 서재"',
+        'STR_KIMTOMA_INTEGRATION: "kimtoma.com 연동"',
+        'STR_OPDS_SERVERS: "온라인 서재 서버"',
+    ):
+        if exact not in korean:
+            fail(f"missing exact kimtoma Korean label: {exact}")
+
+    for relative_path in (
+        "src/activities/boot_sleep/BootActivity.cpp",
+        "src/activities/boot_sleep/SleepActivity.cpp",
+    ):
+        source = (ROOT / relative_path).read_text(encoding="utf-8")
+        for contract in (
+            "ENABLE_KOREAN_VERSION",
+            "KIMTOMA_MARK_120",
+            "STR_KIMTOMA_BRAND",
+            "Logo120",
+            "STR_CROSSPOINT",
+            "(pageWidth - 120) / 2",
+            "(pageHeight - 120) / 2",
+        ):
+            if contract not in source:
+                fail(f"missing Korean branding contract in {relative_path}: {contract}")
+
+    mark_header = (ROOT / "src/images/KimtomaMark120.h").read_text(encoding="utf-8")
+    mark_bytes = re.findall(r"\b0x[0-9a-f]{2}\b", mark_header)
+    if "KIMTOMA_MARK_120" not in mark_header or len(mark_bytes) != 1800:
+        fail("kimtoma mark must be exactly 120x120 1-bit (1,800 bytes)")
+
+    apps = (ROOT / "src/activities/apps/AppsMenuActivity.cpp").read_text(encoding="utf-8")
+    settings = (ROOT / "src/activities/settings/SettingsActivity.cpp").read_text(encoding="utf-8")
+    activity = (ROOT / "src/activities/apps/kimtoma/KimtomaLibraryActivity.cpp").read_text(encoding="utf-8")
+    for contract in ("ENABLE_KIMTOMA_READING_SYNC", "STR_KIMTOMA_LIBRARY", "goToKimtomaLibrary"):
+        if contract not in apps:
+            fail(f"missing kimtoma Apps route contract: {contract}")
+    for contract in ("SettingAction::KimtomaIntegration", "STR_KIMTOMA_INTEGRATION", "STR_OPDS_SERVERS"):
+        if contract not in settings:
+            fail(f"missing kimtoma System route contract: {contract}")
+    if "tokenForRequest" in activity or "default:" in activity:
+        fail("kimtoma activity must keep tokens out of rendering and use closed mode dispatch")
+
+    queue_header = (ROOT / "src/reading_sync/ReadingSyncQueue.h").read_text(encoding="utf-8")
+    types_header = (ROOT / "src/reading_sync/ReadingSyncTypes.h").read_text(encoding="utf-8")
+    if "kSchemaVersion = 2" not in queue_header or "kWireSchemaVersion = 1" not in types_header:
+        fail("queue schema 2 and API wire schema 1 must remain decoupled")
+
+
 def verify(environment: str) -> None:
     build = build_directory(environment)
     binary = build / "firmware.bin"
@@ -140,6 +194,7 @@ def verify(environment: str) -> None:
 
     ini = (ROOT / "platformio.ini").read_text(encoding="utf-8")
     ko = environment_section(ini, environment)
+    verify_kimtoma_device_contracts()
     for fragment in (
         "-<activities/apps/standby/AirPageFace.cpp>",
         "-<activities/apps/standby/AirPageDeviceId.cpp>",
