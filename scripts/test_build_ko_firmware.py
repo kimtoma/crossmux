@@ -147,6 +147,25 @@ class KoreanFirmwareBuildPlanTest(unittest.TestCase):
             plan,
         )
 
+    def test_embedded_sources_are_staged_at_the_path_scons_resolves(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            build = Path(temp_dir) / "build"
+            build.mkdir()
+            for name in build_ko_firmware.EMBEDDED_SOURCE_TARGETS:
+                (build / name).write_text(name, encoding="utf-8")
+
+            staged = build_ko_firmware.stage_embedded_sources_for_scons(
+                build_dir=build,
+                scons_relative_build=Path(".pio/build/ko_sdk_prepare"),
+            )
+
+            self.assertEqual(
+                build / ".pio/build/ko_sdk_prepare",
+                staged,
+            )
+            for name in build_ko_firmware.EMBEDDED_SOURCE_TARGETS:
+                self.assertEqual(name, (staged / name).read_text(encoding="utf-8"))
+
     def test_cached_sdk_build_only_builds_requested_firmware(self) -> None:
         plan = build_ko_firmware.build_plan(
             "gh_release_ko_rc", Path("/pio"), Path("/ninja"), sdk_ready=True
@@ -169,6 +188,7 @@ class KoreanFirmwareBuildPlanTest(unittest.TestCase):
             state_reset=lambda: None,
             stock_preserver=lambda _core: Path("/stock"),
             tls_stager=lambda: Path("/tls"),
+            embedded_source_stager=lambda: Path("/embedded"),
             artifact_installer=lambda *_args: None,
         )
 
@@ -188,6 +208,7 @@ class KoreanFirmwareBuildPlanTest(unittest.TestCase):
                 state_reset=lambda: None,
                 stock_preserver=lambda _core: Path("/stock"),
                 tls_stager=lambda: Path("/tls"),
+                embedded_source_stager=lambda: Path("/embedded"),
                 artifact_installer=lambda *_args: None,
             )
 

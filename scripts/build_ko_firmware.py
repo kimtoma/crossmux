@@ -13,6 +13,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 PREPARE_BUILD = ROOT / ".pio" / "build" / "ko_sdk_prepare"
+PREPARE_RELATIVE_BUILD = PREPARE_BUILD.relative_to(ROOT)
 TLS_MARKERS = (
     "CONFIG_MBEDTLS_ASYMMETRIC_CONTENT_LEN=y",
     "CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384",
@@ -169,6 +170,22 @@ def stage_tls_libraries(
     return staging_dir
 
 
+def stage_embedded_sources_for_scons(
+    *,
+    build_dir: Path = PREPARE_BUILD,
+    scons_relative_build: Path = PREPARE_RELATIVE_BUILD,
+) -> Path:
+    """Mirror CMake-generated sources where pioarduino's SCons pass resolves them."""
+    destination = build_dir / scons_relative_build
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in EMBEDDED_SOURCE_TARGETS:
+        source = build_dir / name
+        if not source.is_file():
+            raise SystemExit(f"embedded source was not generated: {source}")
+        shutil.copy2(source, destination / name)
+    return destination
+
+
 def install_tls_libraries(core: Path, staged: Path) -> None:
     destination = (
         core
@@ -227,6 +244,7 @@ def prepare_sdk(
     state_reset=invalidate_prepare_state,
     stock_preserver=preserve_stock_diagnostics,
     tls_stager=stage_tls_libraries,
+    embedded_source_stager=stage_embedded_sources_for_scons,
     artifact_installer=install_prepared_sdk_artifacts,
 ) -> None:
     preserved_diagnostics = stock_preserver(core)
@@ -235,6 +253,7 @@ def prepare_sdk(
     for command in commands[:-1]:
         runner(command, cwd=ROOT, check=True)
 
+    embedded_source_stager()
     staged_tls = tls_stager()
 
     # pioarduino installs the rebuilt SDK before its final tiny probe link.
