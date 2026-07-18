@@ -55,7 +55,7 @@ void buildPosixTz(const int32_t offsetSecEast, char* buf, const size_t bufSize) 
   const int32_t absSec = posixSec >= 0 ? posixSec : -posixSec;
   const int hours = static_cast<int>(absSec / 3600);
   const int mins = static_cast<int>((absSec % 3600) / 60);
-  const char sign = posixSec >= 0 ? '-' : '+';
+  const char sign = posixSec >= 0 ? '+' : '-';
   if (mins == 0) {
     snprintf(buf, bufSize, "UTC%c%d", sign, hours);
   } else {

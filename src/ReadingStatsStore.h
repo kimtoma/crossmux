@@ -140,7 +140,7 @@ class ReadingStatsStore {
   void resumeSession();
   void updateProgress(uint8_t progressPercent, bool completed = false, const std::string& chapterTitle = "",
                       uint8_t chapterProgressPercent = 0);
-  void endSession();
+  bool endSession();
   bool adjustBookReadingTime(const std::string& path, uint32_t dayOrdinal, int32_t deltaMs);
   bool updateBookMetadata(const std::string& path, const std::string& title, const std::string& author,
                           const std::string& coverBmpPath);

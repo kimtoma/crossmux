@@ -25,7 +25,11 @@ constexpr AppEntry kAppEntries[] = {
     {StrId::STR_WEREAD_TITLE, UIIcon::WeRead, &ActivityManager::goToWeRead},
 #endif
     {StrId::STR_STANDBY_TITLE, UIIcon::Standby, &ActivityManager::goToStandby},
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+    {StrId::STR_KIMTOMA_LIBRARY, UIIcon::Library, &ActivityManager::goToKimtomaLibrary},
+#else
     {StrId::STR_OPDS_BROWSER, UIIcon::Library, &ActivityManager::goToBrowser},
+#endif
 };
 
 constexpr int kAppCount = static_cast<int>(sizeof(kAppEntries) / sizeof(kAppEntries[0]));

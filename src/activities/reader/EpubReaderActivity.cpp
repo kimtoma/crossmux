@@ -26,14 +26,19 @@
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderPercentSelectionActivity.h"
 #include "EpubReaderUtils.h"
+#if !defined(ENABLE_KOREAN_VERSION)
 #include "KOReaderCredentialStore.h"
 #include "KOReaderSyncActivity.h"
+#endif
 #include "MappedInputManager.h"
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"
 #include "ReaderUtils.h"
 #include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncCoordinator.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/AchievementPopupUtils.h"
@@ -287,7 +292,19 @@ void EpubReaderActivity::onExit() {
     saveProgress(origin.spineIndex, origin.pageNumber, 0);
   }
 
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  if (READING_STATS.endSession()) {
+    const ReadingSessionSnapshot& snapshot = READING_STATS.getLastSessionSnapshot();
+    if (snapshot.valid && epub) {
+      const ReadingBookStats* book = READING_STATS.findBook(snapshot.bookId);
+      if (book != nullptr) {
+        READING_SYNC.enqueueAfterSession(snapshot, *book, *epub);
+      }
+    }
+  }
+#else
   READING_STATS.endSession();
+#endif
   ACHIEVEMENTS.recordSessionEnded(READING_STATS.getLastSessionSnapshot());
   showPendingAchievementPopups(renderer);
   section.reset();
@@ -418,12 +435,14 @@ void EpubReaderActivity::loop() {
         }
         break;
       case CrossPointSettings::LP_MENU_KOSYNC:
+#if !defined(ENABLE_KOREAN_VERSION)
         // Hold ~1s launches KOReader sync (or the credentials hint if not logged in).
         if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
           launchKOReaderSync();
           ignoreNextConfirmRelease = true;  // sync launched or error shown; suppress menu open
           return;
         }
+#endif
         break;
       case CrossPointSettings::LP_MENU_DISABLED:
       default:
@@ -718,7 +737,9 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::SYNC: {
+#if !defined(ENABLE_KOREAN_VERSION)
       launchKOReaderSync();
+#endif
       break;
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
@@ -744,6 +765,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
   }
 }
 
+#if !defined(ENABLE_KOREAN_VERSION)
 void EpubReaderActivity::launchKOReaderSync() {
   // No credentials: still open the sync activity so the user sees how to log in
   // (Settings > System). Skip Wi-Fi/TLS prep — onEnter short-circuits to NO_CREDENTIALS.
@@ -802,6 +824,7 @@ void EpubReaderActivity::launchKOReaderSync() {
       renderer, mappedInput, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
       std::move(localChapterName), paragraphIndex));
 }
+#endif
 
 void EpubReaderActivity::applyOrientation(const uint8_t orientation) {
   // No-op if the selected orientation matches current settings.

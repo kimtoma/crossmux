@@ -77,7 +77,7 @@ void HalClock::applySavedTimezone(const uint8_t utcOffsetQuarterHoursBiased) {
   const int32_t absSec = posixSec >= 0 ? posixSec : -posixSec;
   const int hours = static_cast<int>(absSec / 3600);
   const int mins = static_cast<int>((absSec % 3600) / 60);
-  const char sign = posixSec >= 0 ? '-' : '+';
+  const char sign = posixSec >= 0 ? '+' : '-';
   if (mins == 0) {
     snprintf(tz, sizeof(tz), "UTC%c%d", sign, hours);
   } else {

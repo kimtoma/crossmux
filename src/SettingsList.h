@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
+#if !defined(ENABLE_KOREAN_VERSION)
 #include "KOReaderCredentialStore.h"
+#endif
 #include "activities/settings/SettingsActivity.h"
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
@@ -191,9 +193,27 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                   {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                                    StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
                                   "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
+#if defined(ENABLE_KOREAN_VERSION)
+    enum class KoLongPressMenuIndex : uint8_t { Disabled = 0, Bookmark = 1 };
+    v.push_back(SettingInfo::DynamicEnum(
+        StrId::STR_LONG_PRESS_MENU, {StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION},
+        [] {
+          const auto index = SETTINGS.longPressMenuFunction == CrossPointSettings::LP_MENU_BOOKMARK
+                                 ? KoLongPressMenuIndex::Bookmark
+                                 : KoLongPressMenuIndex::Disabled;
+          return static_cast<uint8_t>(index);
+        },
+        [](uint8_t displayedIndex) {
+          SETTINGS.longPressMenuFunction = displayedIndex == static_cast<uint8_t>(KoLongPressMenuIndex::Bookmark)
+                                               ? CrossPointSettings::LP_MENU_BOOKMARK
+                                               : CrossPointSettings::LP_MENU_DISABLED;
+        },
+        "longPressMenuFunction", StrId::STR_CAT_CONTROLS));
+#else
     v.push_back(SettingInfo::Enum(StrId::STR_LONG_PRESS_MENU, &CrossPointSettings::longPressMenuFunction,
                                   {StrId::STR_KOSYNC, StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION},
                                   "longPressMenuFunction", StrId::STR_CAT_CONTROLS));
+#endif
     v.push_back(SettingInfo::Enum(
         StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
         {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
@@ -221,6 +241,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                     "achievementsEnabled", StrId::STR_CAT_SYSTEM));
     v.push_back(SettingInfo::Toggle(StrId::STR_ACHIEVEMENT_POPUPS, &CrossPointSettings::achievementPopups,
                                     "achievementPopups", StrId::STR_CAT_SYSTEM));
+#if !defined(ENABLE_KOREAN_VERSION)
     // --- ryOS Cloud Sync (web-only, uses KOReaderCredentialStore) ---
     v.push_back(SettingInfo::DynamicString(
         StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },
@@ -258,6 +279,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
           KOREADER_STORE.saveToFile();
         },
         "koMatchMethod", StrId::STR_KOREADER_SYNC));
+#endif
     // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
     v.push_back(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
                                     "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));

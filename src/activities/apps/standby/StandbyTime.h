@@ -8,7 +8,8 @@
 // on every cold boot (the device has no battery-backed RTC).
 namespace standby_time {
 
-// True if NTP successfully synced during this boot session.
+// True when NTP synced during this boot or another subsystem already supplied
+// a valid system epoch.
 bool isSynced();
 
 // Setter called by StandbyActivity::finishTimeSync() when NTP completes.

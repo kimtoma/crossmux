@@ -13,6 +13,12 @@
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
 #include "OpdsServerStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncClient.h"
+#include "reading_sync/ReadingSyncCoordinator.h"
+#include "reading_sync/ReadingSyncCredentialStore.h"
+#include "reading_sync/ReadingSyncQueue.h"
+#endif
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
 #include "WebDAVHandler.h"
@@ -36,6 +42,31 @@ namespace {
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+void sendReadingSyncJson(WebServer* server, const int status, const char* body) {
+  server->send(status, "application/json", body);
+}
+
+bool rejectUnexpectedReadingSyncBody(WebServer* server) {
+  if (server->clientContentLength() == 0) {
+    return false;
+  }
+  sendReadingSyncJson(server, 422, "{\"error\":\"invalid_request\"}");
+  return true;
+}
+
+class ReadingSyncRawRequestReset {
+ public:
+  explicit ReadingSyncRawRequestReset(ReadingSyncRawRequestState& state) : state_(state) {}
+  ~ReadingSyncRawRequestReset() { state_.start(); }
+
+  ReadingSyncRawRequestReset(const ReadingSyncRawRequestReset&) = delete;
+  ReadingSyncRawRequestReset& operator=(const ReadingSyncRawRequestReset&) = delete;
+
+ private:
+  ReadingSyncRawRequestState& state_;
+};
+#endif
 
 // Static pointer for WebSocket callback (WebSocketsServer requires C-style callback)
 CrossPointWebServer* wsInstance = nullptr;
@@ -165,6 +196,25 @@ void CrossPointWebServer::begin() {
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
 
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  server->on("/api/reading-sync/status", HTTP_GET, [this] { handleReadingSyncStatus(); });
+  // The four-argument overload keeps ordinary request bodies on WebServer's
+  // fixed HTTPRaw chunks. Multipart still goes through the framework-wide
+  // _parseForm path before this callback; final handlers reject those bodies.
+  server->on(
+      "/api/reading-sync/token", HTTP_POST, [this] { handleReadingSyncTokenPost(); },
+      [this] { handleReadingSyncTokenRaw(); });
+  server->on(
+      "/api/reading-sync/token", HTTP_DELETE, [this] { handleReadingSyncTokenDelete(); },
+      [this] { handleReadingSyncDiscardRaw(); });
+  server->on(
+      "/api/reading-sync/test", HTTP_POST, [this] { handleReadingSyncTest(); },
+      [this] { handleReadingSyncDiscardRaw(); });
+  server->on(
+      "/api/reading-sync/retry", HTTP_POST, [this] { handleReadingSyncRetry(); },
+      [this] { handleReadingSyncDiscardRaw(); });
+#endif
+
   // Font management endpoints
   server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
   server->on("/api/fonts", HTTP_GET, [this] { handleFontList(); });
@@ -192,8 +242,8 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
 
   // Collect WebDAV headers and register handler
-  const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout"};
-  server->collectHeaders(davHeaders, 6);
+  const char* requestHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout", "Content-Type"};
+  server->collectHeaders(requestHeaders, 7);
   server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
   LOG_DBG("WEB", "WebDAV handler initialized");
 
@@ -1300,6 +1350,137 @@ void CrossPointWebServer::handlePostSettings() {
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
 }
+
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+void CrossPointWebServer::handleReadingSyncStatus() const {
+  JsonDocument document;
+  document["configured"] = READING_SYNC_CREDENTIALS.hasToken();
+  document["masked"] = READING_SYNC_CREDENTIALS.maskedStatus();
+  document["authPaused"] = READING_SYNC_QUEUE.authenticationPaused();
+  document["queueCorrupt"] = READING_SYNC_QUEUE.isCorrupt();
+
+  char output[192] = {};
+  const size_t written = serializeJson(document, output, sizeof(output));
+  if (document.overflowed() || written == 0 || written >= sizeof(output)) {
+    sendReadingSyncJson(server.get(), 500, "{\"error\":\"temporarily_unavailable\"}");
+    return;
+  }
+  sendReadingSyncJson(server.get(), 200, output);
+}
+
+void CrossPointWebServer::handleReadingSyncTokenPost() {
+  ReadingSyncRawRequestReset reset(readingSyncRawRequest_);
+  if (!server->header("Content-Type").equalsIgnoreCase("application/json") || !readingSyncRawRequest_.complete() ||
+      readingSyncRawRequest_.overflowed()) {
+    sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
+    return;
+  }
+
+  JsonDocument document;
+  const DeserializationError error =
+      deserializeJson(document, readingSyncRawRequest_.data(), readingSyncRawRequest_.size());
+  if (error || document.overflowed() || !document.is<JsonObjectConst>()) {
+    sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
+    return;
+  }
+
+  const JsonObjectConst root = document.as<JsonObjectConst>();
+  if (root.size() != 1 || !root["token"].is<const char*>()) {
+    sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
+    return;
+  }
+
+  if (!READING_SYNC_CREDENTIALS.setToken(root["token"].as<const char*>())) {
+    sendReadingSyncJson(server.get(), 422, "{\"error\":\"invalid_token\"}");
+    return;
+  }
+
+  READING_SYNC_QUEUE.resumeAuthentication();
+  if (READING_SYNC_QUEUE.authenticationPaused()) {
+    sendReadingSyncJson(server.get(), 500, "{\"error\":\"persistence_failed\"}");
+    return;
+  }
+  server->send(204, "application/json", "");
+}
+
+void CrossPointWebServer::handleReadingSyncTokenRaw() {
+  // The fourth callback is also used for multipart uploads. _parseForm owns
+  // those allocations, so never access raw() unless the JSON route selected
+  // WebServer's fixed HTTPRaw parser.
+  if (!server->header("Content-Type").equalsIgnoreCase("application/json")) {
+    return;
+  }
+
+  HTTPRaw& raw = server->raw();
+  switch (raw.status) {
+    case RAW_START:
+      readingSyncRawRequest_.start();
+      break;
+    case RAW_WRITE:
+      readingSyncRawRequest_.append(raw.buf, raw.currentSize);
+      break;
+    case RAW_END:
+      readingSyncRawRequest_.finish();
+      break;
+    case RAW_ABORTED:
+      readingSyncRawRequest_.abort();
+      break;
+  }
+}
+
+void CrossPointWebServer::handleReadingSyncDiscardRaw() {
+  // Selecting the raw callback is the contract: WebServer drains ordinary
+  // bodies through its fixed buffer. This handler deliberately retains none.
+}
+
+void CrossPointWebServer::handleReadingSyncTokenDelete() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
+  if (!READING_SYNC_CREDENTIALS.clearToken()) {
+    sendReadingSyncJson(server.get(), 500, "{\"error\":\"persistence_failed\"}");
+    return;
+  }
+
+  READING_SYNC_QUEUE.resumeAuthentication();
+  if (READING_SYNC_QUEUE.authenticationPaused()) {
+    sendReadingSyncJson(server.get(), 500, "{\"error\":\"persistence_failed\"}");
+    return;
+  }
+  server->send(204, "application/json", "");
+}
+
+void CrossPointWebServer::handleReadingSyncTest() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
+  if (!READING_SYNC_CREDENTIALS.hasToken()) {
+    sendReadingSyncJson(server.get(), 401, "{\"ok\":false,\"error\":\"authentication_failed\"}");
+    return;
+  }
+
+  const HttpDownloader::HttpResult result =
+      READING_SYNC_CLIENT.validate(READING_SYNC_CREDENTIALS.tokenForRequest(), nullptr);
+  if (result.statusCode == 200 && result.error == HttpDownloader::OK) {
+    sendReadingSyncJson(server.get(), 200, "{\"ok\":true}");
+    return;
+  }
+  if ((result.statusCode == 401 || result.statusCode == 403) && result.error == HttpDownloader::AUTH_FAILED) {
+    READING_SYNC_QUEUE.pauseAuthentication();
+    sendReadingSyncJson(server.get(), result.statusCode, "{\"ok\":false,\"error\":\"authentication_failed\"}");
+    return;
+  }
+  sendReadingSyncJson(server.get(), 503, "{\"ok\":false,\"error\":\"temporarily_unavailable\"}");
+}
+
+void CrossPointWebServer::handleReadingSyncRetry() {
+  if (rejectUnexpectedReadingSyncBody(server.get())) {
+    return;
+  }
+  READING_SYNC.requestManualRetry();
+  sendReadingSyncJson(server.get(), 202, "{\"scheduled\":true}");
+}
+#endif
 
 // ---- OPDS Server API ----
 

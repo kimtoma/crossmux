@@ -83,6 +83,9 @@ class ActivityManager {
   void goToFileTransfer();
   void goToSettings();
   void goToReadingStatsMenu();
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  void goToKimtomaLibrary();
+#endif
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
   void goToBrowser();

@@ -1,6 +1,7 @@
 #include "HttpDownloader.h"
 
 #include <Arduino.h>
+#include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <Stream.h>
@@ -8,6 +9,9 @@
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
 
+#include <algorithm>
+#include <climits>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <string>
@@ -153,9 +157,22 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
 // setTimeout(0) makes Stream::timedRead bail immediately on -1 (our
 // "no more data" code), so ArduinoJson stops as soon as it has parsed the
 // closing token rather than spending the default 1s waiting for more input.
+bool isCancelled(const std::atomic_bool* cancelFlag) {
+  return cancelFlag != nullptr && cancelFlag->load(std::memory_order_relaxed);
+}
+
 class EspHttpReadStream final : public Stream {
  public:
-  explicit EspHttpReadStream(esp_http_client_handle_t client) : client_(client) { setTimeout(0); }
+  EspHttpReadStream(esp_http_client_handle_t client, const std::atomic_bool* cancelFlag)
+      : client_(client), cancelFlag_(cancelFlag), buf_(makeUniqueNoThrow<char[]>(kBufSize)) {
+    // The 1 KiB response buffer cannot safely live on the 4 KiB network task
+    // stack. Allocate it once for this cold request path and release via RAII.
+    if (!buf_) {
+      LOG_ERR("HTTP", "OOM: %u byte response buffer", static_cast<unsigned>(kBufSize));
+      error_ = HttpDownloader::HTTP_ERROR;
+    }
+    setTimeout(0);
+  }
 
   int available() override { return static_cast<int>(len_ - pos_); }
 
@@ -171,14 +188,21 @@ class EspHttpReadStream final : public Stream {
 
   size_t write(uint8_t) override { return 0; }
   void flush() override {}
+  bool healthy() const { return buf_ != nullptr; }
+  HttpDownloader::DownloadError error() const { return error_; }
 
  private:
   static constexpr size_t kBufSize = 1024;
 
   bool refill() {
-    const int n = esp_http_client_read(client_, buf_, static_cast<int>(kBufSize));
+    if (!buf_ || isCancelled(cancelFlag_)) {
+      error_ = buf_ ? HttpDownloader::ABORTED : HttpDownloader::HTTP_ERROR;
+      return false;
+    }
+    const int n = esp_http_client_read(client_, buf_.get(), static_cast<int>(kBufSize));
     if (n < 0) {
       LOG_ERR("HTTP", "read error mid-body");
+      error_ = HttpDownloader::HTTP_ERROR;
       return false;
     }
     if (n == 0) return false;  // server-side EOF
@@ -188,13 +212,79 @@ class EspHttpReadStream final : public Stream {
   }
 
   esp_http_client_handle_t client_;
-  char buf_[kBufSize] = {};
+  const std::atomic_bool* cancelFlag_ = nullptr;
+  std::unique_ptr<char[]> buf_;
   size_t pos_ = 0;
   size_t len_ = 0;
+  HttpDownloader::DownloadError error_ = HttpDownloader::OK;
 };
 
-bool runPostJson(const std::string& url, const std::string& payload, const std::string& bearerToken,
-                 const std::function<bool(Stream&)>& onResponse, int timeoutMs) {
+class HttpClientCleanup final {
+ public:
+  explicit HttpClientCleanup(const esp_http_client_handle_t client) : client_(client) {}
+  ~HttpClientCleanup() {
+    if (client_ != nullptr) {
+      esp_http_client_cleanup(client_);
+    }
+  }
+
+  HttpClientCleanup(const HttpClientCleanup&) = delete;
+  HttpClientCleanup& operator=(const HttpClientCleanup&) = delete;
+
+ private:
+  esp_http_client_handle_t client_;
+};
+
+void setBearerHeader(const esp_http_client_handle_t client, const std::string& bearerToken) {
+  if (bearerToken.empty()) {
+    return;
+  }
+
+  // The credential must be contiguous and null-terminated at the ESP-IDF C API
+  // boundary. This one bounded network-lifetime string is released on return.
+  std::string authHeader;
+  authHeader.reserve(sizeof("Bearer ") - 1 + bearerToken.size());
+  authHeader.append("Bearer ").append(bearerToken);
+  esp_http_client_set_header(client, "Authorization", authHeader.c_str());
+}
+
+HttpDownloader::HttpResult consumeResponse(const esp_http_client_handle_t client, const int statusCode,
+                                           const std::function<bool(Stream&)>& onResponse,
+                                           const std::atomic_bool* cancelFlag) {
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, statusCode};
+  }
+
+  EspHttpReadStream bodyStream(client, cancelFlag);
+  if (!bodyStream.healthy()) {
+    return {HttpDownloader::HTTP_ERROR, statusCode};
+  }
+  const bool consumerOk = !onResponse || onResponse(bodyStream);
+  if (bodyStream.error() != HttpDownloader::OK) {
+    return {bodyStream.error(), statusCode};
+  }
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, statusCode};
+  }
+  if (statusCode == 401 || statusCode == 403) {
+    return {HttpDownloader::AUTH_FAILED, statusCode};
+  }
+  if (statusCode != 200 || !consumerOk) {
+    return {HttpDownloader::HTTP_ERROR, statusCode};
+  }
+  return {HttpDownloader::OK, statusCode};
+}
+
+HttpDownloader::HttpResult runPostJson(const std::string& url, const std::string& payload,
+                                       const std::string& bearerToken, const std::function<bool(Stream&)>& onResponse,
+                                       const int timeoutMs, const std::atomic_bool* cancelFlag) {
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, 0};
+  }
+  if (payload.size() > static_cast<size_t>(INT_MAX)) {
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+
   esp_http_client_config_t config = {};
   config.url = url.c_str();
   config.buffer_size = HTTP_RX_BUF;
@@ -204,63 +294,166 @@ bool runPostJson(const std::string& url, const std::string& payload, const std::
   config.crt_bundle_attach = esp_crt_bundle_attach;
   config.method = HTTP_METHOD_POST;
   config.keep_alive_enable = true;
+#ifndef CROSSPOINT_EMULATED
+  config.disable_auto_redirect = true;
+#endif
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (!client) {
     LOG_ERR("HTTP", "POST client init failed");
-    return false;
+    return {HttpDownloader::HTTP_ERROR, 0};
   }
+  const HttpClientCleanup cleanup(client);
+#ifdef CROSSPOINT_EMULATED
+  client->follow_redirects = false;
+#endif
 
   esp_http_client_set_header(client, "Content-Type", "application/json");
   esp_http_client_set_header(client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
-  if (!bearerToken.empty()) {
-    const std::string authHeader = "Bearer " + bearerToken;
-    esp_http_client_set_header(client, "Authorization", authHeader.c_str());
-  }
+  setBearerHeader(client, bearerToken);
 
   // open(content_length) reserves the body length for the request line;
   // write() then streams the payload. POST does not follow redirects here —
   // a 30x on a JSON RPC endpoint is a server misconfiguration we want to
   // surface, not silently re-POST against.
-  esp_err_t err = esp_http_client_open(client, static_cast<int>(payload.size()));
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, 0};
+  }
+  const esp_err_t err = esp_http_client_open(client, static_cast<int>(payload.size()));
   if (err != ESP_OK) {
     LOG_ERR("HTTP", "POST open failed: %s", esp_err_to_name(err));
-    esp_http_client_cleanup(client);
-    return false;
+    return {HttpDownloader::HTTP_ERROR, 0};
   }
 
-  if (!payload.empty()) {
-    const int written = esp_http_client_write(client, payload.data(), static_cast<int>(payload.size()));
-    if (written < 0 || static_cast<size_t>(written) != payload.size()) {
-      LOG_ERR("HTTP", "POST write short: %d of %u", written, static_cast<unsigned>(payload.size()));
-      esp_http_client_cleanup(client);
-      return false;
+  size_t payloadOffset = 0;
+  while (payloadOffset < payload.size()) {
+    if (isCancelled(cancelFlag)) {
+      return {HttpDownloader::ABORTED, 0};
     }
+    const int written =
+        esp_http_client_write(client, payload.data() + payloadOffset, static_cast<int>(payload.size() - payloadOffset));
+    if (written <= 0) {
+      LOG_ERR("HTTP", "POST request write failed");
+      return {HttpDownloader::HTTP_ERROR, 0};
+    }
+    payloadOffset += static_cast<size_t>(written);
   }
 
   const int64_t contentLength = esp_http_client_fetch_headers(client);
-  (void)contentLength;  // body length is irrelevant when streaming
   const int status = esp_http_client_get_status_code(client);
-  if (status != 200) {
-    LOG_ERR("HTTP", "POST unexpected status: %d", status);
-    esp_http_client_cleanup(client);
-    return false;
+  if (contentLength < 0) {
+    LOG_ERR("HTTP", "POST response header read failed");
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+  return consumeResponse(client, status, onResponse, cancelFlag);
+}
+
+HttpDownloader::HttpResult runPutFile(const std::string& url, const std::string& path, const std::string& mime,
+                                      const std::string& sha256, const std::string& bearerToken,
+                                      const std::function<bool(Stream&)>& onResponse, const int timeoutMs,
+                                      const std::atomic_bool* cancelFlag, const size_t chunkSize) {
+  constexpr size_t MAX_UPLOAD_CHUNK = 1024;
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, 0};
+  }
+  if (chunkSize == 0 || chunkSize > MAX_UPLOAD_CHUNK) {
+    return {HttpDownloader::HTTP_ERROR, 0};
   }
 
-  EspHttpReadStream bodyStream(client);
-  const bool consumerOk = onResponse(bodyStream);
-  esp_http_client_cleanup(client);
-  // A successful consumer (e.g., ArduinoJson hitting the closing `}`) is the
-  // ground truth for "body received". Don't require draining the stream — a
-  // valid JSON document parses without reading any trailing bytes the server
-  // might still send (whitespace, server-side keepalive padding). The device
-  // GET path checks is_complete_data_received because it counts bytes against
-  // Content-Length; here the parser is the framing.
-  if (!consumerOk) {
-    LOG_ERR("HTTP", "POST consumer reported failure");
-    return false;
+  HalFile file;
+  if (!Storage.openFileForRead("HTTP", path, file)) {
+    LOG_ERR("HTTP", "PUT staged file is not readable");
+    return {HttpDownloader::FILE_ERROR, 0};
   }
-  return true;
+  const uint64_t fileSize = file.fileSize64();
+  constexpr uint64_t MAX_COVER_BYTES = 2097152;
+  if (fileSize == 0 || fileSize > MAX_COVER_BYTES || fileSize > static_cast<uint64_t>(INT_MAX)) {
+    LOG_ERR("HTTP", "PUT staged file has invalid size");
+    return {HttpDownloader::FILE_ERROR, 0};
+  }
+
+  // A network task cannot afford a 1 KiB local array. This single bounded
+  // upload buffer is allocated after the file is validated and freed by RAII.
+  auto uploadBuffer = makeUniqueNoThrow<char[]>(chunkSize);
+  if (!uploadBuffer) {
+    LOG_ERR("HTTP", "OOM: %u byte upload buffer", static_cast<unsigned>(chunkSize));
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+
+  esp_http_client_config_t config = {};
+  config.url = url.c_str();
+  config.buffer_size = HTTP_RX_BUF;
+  config.buffer_size_tx = HTTP_TX_BUF;
+  config.timeout_ms = timeoutMs;
+  config.crt_bundle_attach = esp_crt_bundle_attach;
+  config.method = HTTP_METHOD_PUT;
+  config.keep_alive_enable = true;
+#ifndef CROSSPOINT_EMULATED
+  config.disable_auto_redirect = true;
+#endif
+
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (!client) {
+    LOG_ERR("HTTP", "PUT client init failed");
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+  const HttpClientCleanup cleanup(client);
+#ifdef CROSSPOINT_EMULATED
+  client->follow_redirects = false;
+#endif
+
+  char contentLength[24] = {};
+  std::snprintf(contentLength, sizeof(contentLength), "%llu", static_cast<unsigned long long>(fileSize));
+  esp_http_client_set_header(client, "Content-Type", mime.c_str());
+  esp_http_client_set_header(client, "Content-Length", contentLength);
+  esp_http_client_set_header(client, "X-Cover-SHA256", sha256.c_str());
+  esp_http_client_set_header(client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
+  setBearerHeader(client, bearerToken);
+
+  if (isCancelled(cancelFlag)) {
+    return {HttpDownloader::ABORTED, 0};
+  }
+  const esp_err_t err = esp_http_client_open(client, static_cast<int>(fileSize));
+  if (err != ESP_OK) {
+    LOG_ERR("HTTP", "PUT open failed: %s", esp_err_to_name(err));
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+
+  uint64_t uploaded = 0;
+  while (uploaded < fileSize) {
+    if (isCancelled(cancelFlag)) {
+      return {HttpDownloader::ABORTED, 0};
+    }
+    const size_t bytesToRead = static_cast<size_t>(std::min<uint64_t>(chunkSize, fileSize - uploaded));
+    const int bytesRead = file.read(uploadBuffer.get(), bytesToRead);
+    if (bytesRead != static_cast<int>(bytesToRead)) {
+      LOG_ERR("HTTP", "PUT staged file read failed");
+      return {HttpDownloader::FILE_ERROR, 0};
+    }
+
+    size_t chunkOffset = 0;
+    while (chunkOffset < bytesToRead) {
+      if (isCancelled(cancelFlag)) {
+        return {HttpDownloader::ABORTED, 0};
+      }
+      const int written =
+          esp_http_client_write(client, &uploadBuffer[chunkOffset], static_cast<int>(bytesToRead - chunkOffset));
+      if (written <= 0) {
+        LOG_ERR("HTTP", "PUT request write failed");
+        return {HttpDownloader::HTTP_ERROR, 0};
+      }
+      chunkOffset += static_cast<size_t>(written);
+    }
+    uploaded += bytesToRead;
+  }
+
+  const int64_t responseLength = esp_http_client_fetch_headers(client);
+  const int status = esp_http_client_get_status_code(client);
+  if (responseLength < 0) {
+    LOG_ERR("HTTP", "PUT response header read failed");
+    return {HttpDownloader::HTTP_ERROR, 0};
+  }
+  return consumeResponse(client, status, onResponse, cancelFlag);
 }
 }  // namespace
 
@@ -295,7 +488,24 @@ HttpDownloader::DownloadError HttpDownloader::fetchUrl(const std::string& url, c
 bool HttpDownloader::postJson(const std::string& url, const std::string& payload, const std::string& bearerToken,
                               const std::function<bool(Stream&)>& onResponse, int timeoutMs) {
   LOG_DBG("HTTP", "POST: %s (body=%u bytes)", url.c_str(), static_cast<unsigned>(payload.size()));
-  return runPostJson(url, payload, bearerToken, onResponse, timeoutMs);
+  const HttpResult result = postJsonWithStatus(url, payload, bearerToken, onResponse, timeoutMs);
+  return result.error == OK && result.statusCode == 200;
+}
+
+HttpDownloader::HttpResult HttpDownloader::postJsonWithStatus(const std::string& url, const std::string& payload,
+                                                              const std::string& bearerToken,
+                                                              const std::function<bool(Stream&)>& onResponse,
+                                                              const int timeoutMs, const std::atomic_bool* cancelFlag) {
+  return runPostJson(url, payload, bearerToken, onResponse, timeoutMs, cancelFlag);
+}
+
+HttpDownloader::HttpResult HttpDownloader::putFileWithStatus(const std::string& url, const std::string& path,
+                                                             const std::string& mime, const std::string& sha256,
+                                                             const std::string& bearerToken,
+                                                             const std::function<bool(Stream&)>& onResponse,
+                                                             const int timeoutMs, const std::atomic_bool* cancelFlag,
+                                                             const size_t chunkSize) {
+  return runPutFile(url, path, mime, sha256, bearerToken, onResponse, timeoutMs, cancelFlag, chunkSize);
 }
 
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& destPath,

@@ -2,11 +2,16 @@
 
 #include <FontCacheManager.h>
 #include <HalPowerManager.h>
+#include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 
 #include "OpdsServerStore.h"
 #include "apps/AppsMenuActivity.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "apps/kimtoma/KimtomaLibraryActivity.h"
+#endif
 #ifdef ENABLE_CHINESE_VERSION
 #include "apps/weread/WeReadBookActivity.h"
 #include "apps/weread/WeReadMenuActivity.h"
@@ -241,6 +246,17 @@ void ActivityManager::goToApps() { replaceActivity(std::make_unique<AppsMenuActi
 void ActivityManager::goToReadingStatsMenu() {
   replaceActivity(std::make_unique<ReadingStatsMenuActivity>(renderer, mappedInput));
 }
+
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+void ActivityManager::goToKimtomaLibrary() {
+  auto activity = makeUniqueNoThrow<KimtomaLibraryActivity>(renderer, mappedInput, KimtomaLibraryMode::Library);
+  if (!activity) {
+    LOG_ERR("ACT", "Could not allocate kimtoma library activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+#endif
 
 void ActivityManager::goToStandby() { replaceActivity(std::make_unique<StandbyActivity>(renderer, mappedInput)); }
 

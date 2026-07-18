@@ -21,11 +21,16 @@
 #include "AchievementsStore.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#if !defined(ENABLE_KOREAN_VERSION)
 #include "KOReaderCredentialStore.h"
+#endif
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncCoordinator.h"
+#endif
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
@@ -466,6 +471,12 @@ void setup() {
   HalSystem::checkPanic();
 
   SETTINGS.loadFromFile();
+#if defined(ENABLE_KOREAN_VERSION)
+  if (SETTINGS.longPressMenuFunction == CrossPointSettings::LP_MENU_KOSYNC) {
+    SETTINGS.longPressMenuFunction = CrossPointSettings::LP_MENU_BOOKMARK;
+    SETTINGS.saveToFile();
+  }
+#endif
 
   if (SETTINGS.clockUtcOffsetQ > 104) {
     SETTINGS.clockUtcOffsetQ = 48;
@@ -476,9 +487,14 @@ void setup() {
   APP_STATE.loadFromFile();
   RECENT_BOOKS.loadFromFile();
   READING_STATS.loadFromFile();
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  READING_SYNC.loadFromFile();
+#endif
   ACHIEVEMENTS.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
+#if !defined(ENABLE_KOREAN_VERSION)
   KOREADER_STORE.loadFromFile();
+#endif
   OPDS_STORE.loadFromFile();
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);

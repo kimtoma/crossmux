@@ -2,6 +2,7 @@
 
 #include <Bitmap.h>
 #include <Epub.h>
+#include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -16,6 +17,10 @@
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "reading_sync/ReadingSyncCoordinator.h"
+#include "reading_sync/ReadingSyncPolicy.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -139,6 +144,10 @@ void HomeActivity::onEnter() {
 }
 
 void HomeActivity::onExit() {
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  READING_SYNC.requestCancel();
+  READING_SYNC.waitUntilStopped();
+#endif
   Activity::onExit();
 
   // Free the stored cover buffer if any
@@ -146,6 +155,11 @@ void HomeActivity::onExit() {
 }
 
 bool HomeActivity::storeCoverBuffer() {
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  // The ~16 KiB tile snapshot is only a redraw optimization. Leave that
+  // contiguous block available while Wi-Fi and TLS own the network heap.
+  if (READING_SYNC.isRunning()) return false;
+#endif
   // render() must have already set the cover rect; without it we'd be back to
   // cloning the whole framebuffer.
   if (coverRectW <= 0 || coverRectH <= 0) return false;
@@ -285,6 +299,22 @@ void HomeActivity::render(RenderLock&&) {
   } else if (!recentsLoaded && !recentsLoading) {
     recentsLoading = true;
     loadRecentCovers(metrics.homeCoverHeight);
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+    // Thumbnail generation opens the EPUB and image decoders, so wait until
+    // their temporary allocations are gone before starting Wi-Fi/TLS. The
+    // painted screen remains valid after its optional tile cache is released.
+    if (!readingSyncStartAttempted && isReadingSyncHomeReady(firstRenderDone, recentsLoaded, recentsLoading)) {
+      readingSyncStartAttempted = true;
+      freeCoverBuffer();
+      // The home frame is already on the e-ink panel. Release its decompressed
+      // glyph pages and the reader-warmed SD advance table now; a later redraw
+      // will rebuild both after networking. The advance table can reach ~24 KiB.
+      if (FontCacheManager* fontCache = renderer.getFontCacheManager(); fontCache != nullptr) {
+        fontCache->clearAllCaches();
+      }
+      READING_SYNC.startOneShotIfPending();
+    }
+#endif
   }
 }
 

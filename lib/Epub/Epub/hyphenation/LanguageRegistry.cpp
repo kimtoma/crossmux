@@ -1,5 +1,6 @@
 #include "LanguageRegistry.h"
 
+#if !defined(ENABLE_KOREAN_VERSION)
 #include <algorithm>
 #include <array>
 
@@ -13,9 +14,13 @@
 #include "generated/hyph-ru.trie.h"
 #include "generated/hyph-sv.trie.h"
 #include "generated/hyph-uk.trie.h"
+#endif
 
 namespace {
 
+#if defined(ENABLE_KOREAN_VERSION)
+constexpr LanguageEntry kEmptyEntrySentinel{nullptr, nullptr, nullptr};
+#else
 // English hyphenation patterns (3/3 minimum prefix/suffix length)
 LanguageHyphenator englishHyphenator(en_patterns, isLatinLetter, toLowerLatin, 3, 3);
 LanguageHyphenator frenchHyphenator(fr_patterns, isLatinLetter, toLowerLatin);
@@ -41,17 +46,27 @@ const EntryArray& entries() {
                                        {"ukrainian", "uk", &ukrainianHyphenator}}};
   return kEntries;
 }
+#endif
 
 }  // namespace
 
 const LanguageHyphenator* getLanguageHyphenatorForPrimaryTag(const std::string& primaryTag) {
+#if defined(ENABLE_KOREAN_VERSION)
+  (void)primaryTag;
+  return nullptr;
+#else
   const auto& allEntries = entries();
   const auto it = std::find_if(allEntries.begin(), allEntries.end(),
                                [&primaryTag](const LanguageEntry& entry) { return primaryTag == entry.primaryTag; });
   return (it != allEntries.end()) ? it->hyphenator : nullptr;
+#endif
 }
 
 LanguageEntryView getLanguageEntries() {
+#if defined(ENABLE_KOREAN_VERSION)
+  return LanguageEntryView{&kEmptyEntrySentinel, 0};
+#else
   const auto& allEntries = entries();
   return LanguageEntryView{allEntries.data(), allEntries.size()};
+#endif
 }

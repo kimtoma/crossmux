@@ -59,7 +59,13 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 
 **Current Versions** (as of [../file-formats.md](../file-formats.md)):
 - `book.bin`: **Version 10** — stores NFC metadata plus the OPF spine's RTL page-progression flag.
-- `section.bin`: **per-flavor** — Latin builds **Version 53**, Chinese builds (`ENABLE_CHINESE_VERSION`) **Version 54**. The two flavors emit different word streams (per-character CJK tokenization), so each carries an independent counter; numbers stay distinct so a firmware flavor swap never reuses the other's cache.
+- `section.bin`: **per-flavor** — Latin builds **Version 54**, Traditional Chinese
+  **Version 73**, Simplified Chinese **Version 74**, Japanese **Version 75**, and
+  Korean **Version 76**. CJK versions 73–76 preserve explicit source spaces and
+  apply the CSS segment-break rule: formatting newlines between no-space CJK
+  characters disappear, while Korean and mixed-script word boundaries remain.
+  Each flavor keeps a distinct counter so a firmware flavor swap never reuses
+  another flavor's rendered cache.
 
 **Version Increment Rules**:
 1. **ALWAYS increment version** BEFORE changing binary structure

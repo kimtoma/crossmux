@@ -143,6 +143,59 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build/test --output-on-failure -j
 
+  ko-release-gate:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip "PyYAML>=6.0.3"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Build Korean release
+        run: pio run -e gh_release_ko
+
+      - name: Gate Korean release
+        run: |
+          set -euo pipefail
+          (
+            set -euo pipefail
+            python3 -m unittest lib/EpdFont/scripts/test_build_ko_charset.py -v
+            python3 scripts/test_ko_workflow_gates.py -v
+            python3 scripts/test_verify_ko_release.py -v
+            python3 scripts/verify_ko_release.py
+          ) 2>&1 | tee ko-verifier.log
+
+      - name: Upload Korean gate failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ko-release-gate-failure
+          path: |
+            ko-verifier.log
+            .pio/build/gh_release_ko/firmware.map
+            .pio/build/gh_release_ko/firmware.bin
+          if-no-files-found: warn
+
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
   # PR requirements.
   test-status:
@@ -151,6 +204,7 @@ jobs:
       - build
       - clang-format
       - cppcheck
+      - ko-release-gate
       - unit-tests
     if: always()
     runs-on: ubuntu-latest

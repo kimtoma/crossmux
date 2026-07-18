@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -13,7 +14,9 @@
 #include "DateTimeSettingsActivity.h"
 #include "FontDownloadActivity.h"
 #include "FontSelectionActivity.h"
+#if !defined(ENABLE_KOREAN_VERSION)
 #include "KOReaderSettingsActivity.h"
+#endif
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
@@ -22,6 +25,9 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "activities/apps/kimtoma/KimtomaLibraryActivity.h"
+#endif
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -62,7 +68,12 @@ void SettingsActivity::rebuildSettingsLists() {
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_DATE_AND_TIME, SettingAction::DateTimeSettings));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
+#if !defined(ENABLE_KOREAN_VERSION)
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
+#endif
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_KIMTOMA_INTEGRATION, SettingAction::KimtomaIntegration));
+#endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
@@ -238,9 +249,22 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::CustomiseStatusBar:
         startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
+#if !defined(ENABLE_KOREAN_VERSION)
       case SettingAction::KOReaderSync:
         startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
+#endif
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+      case SettingAction::KimtomaIntegration: {
+        auto activity = makeUniqueNoThrow<KimtomaLibraryActivity>(renderer, mappedInput, KimtomaLibraryMode::Settings);
+        if (!activity) {
+          LOG_ERR("SET", "Could not allocate kimtoma integration activity");
+          break;
+        }
+        startActivityForResult(std::move(activity), resultHandler);
+        break;
+      }
+#endif
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
