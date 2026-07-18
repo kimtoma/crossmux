@@ -7,20 +7,29 @@
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 #include "ReadingStatsStore.h"
 #pragma GCC diagnostic pop
+#include "network/ReadingSyncRawRequestState.h"
 #include "reading_sync/ReadingSyncClient.h"
 #include "reading_sync/ReadingSyncCoordinator.h"
 #include "reading_sync/ReadingSyncCredentialStore.h"
 #include "reading_sync/ReadingSyncPolicy.h"
 #include "reading_sync/ReadingSyncQueue.h"
-#include "network/ReadingSyncRawRequestState.h"
 
-static_assert(ReadingSyncQueue::kSchemaVersion == 1);
+static_assert(ReadingSyncQueue::kSchemaVersion == 2);
+static_assert(ReadingSyncMetadata::kWireSchemaVersion == 1);
 static_assert(ReadingSyncCoordinator::kWifiTimeoutMs == 8000);
 static_assert(ReadingSyncCoordinator::kHttpTimeoutMs == 15000);
 static_assert(!std::is_copy_constructible_v<ReadingSyncCoordinator>);
 static_assert(!std::is_copy_assignable_v<ReadingSyncCoordinator>);
 static_assert(
     std::is_invocable_r_v<void, decltype(&ReadingSyncCoordinator::waitUntilStopped), ReadingSyncCoordinator&>);
+static_assert(std::is_invocable_r_v<bool, decltype(&ReadingSyncCoordinator::requestManualRetryAndStart),
+                                    ReadingSyncCoordinator&>);
+static_assert(
+    std::is_invocable_r_v<bool, decltype(&ReadingSyncCoordinator::requestConnectionTest), ReadingSyncCoordinator&>);
+static_assert(std::is_invocable_r_v<KimtomaConnectionTestState, decltype(&ReadingSyncCoordinator::connectionTestState),
+                                    const ReadingSyncCoordinator&>);
+static_assert(std::is_invocable_r_v<ReadingSyncWorkerOperation, decltype(&ReadingSyncCoordinator::workerOperation),
+                                    const ReadingSyncCoordinator&>);
 static_assert(std::is_invocable_r_v<bool, decltype(&ReadingStatsStore::endSession), ReadingStatsStore&>);
 static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,
                                     ReadingSyncQueue&, ReadingSyncCredentialStore&, const std::atomic_bool*>);
@@ -77,6 +86,58 @@ TEST(ReadingSyncPolicy, QualifiesAtAnyApprovedThreshold) {
   EXPECT_TRUE(qualifiesForReadingSync({1000, 99, 100, true}));
   EXPECT_FALSE(qualifiesForReadingSync({179999, 20, 20, false}));
   EXPECT_FALSE(qualifiesForReadingSync({1000, 21, 20, false}));
+}
+
+TEST(ReadingSyncPolicy, StartsHomeSyncOnlyAfterCoverPreparationFinishes) {
+  EXPECT_FALSE(isReadingSyncHomeReady(false, false, false));
+  EXPECT_FALSE(isReadingSyncHomeReady(true, false, false));
+  EXPECT_FALSE(isReadingSyncHomeReady(true, true, true));
+  EXPECT_TRUE(isReadingSyncHomeReady(true, true, false));
+}
+
+TEST(ReadingSyncPolicy, ManualSyncCreatesLatestSnapshotOnlyWhenQueueIsEmpty) {
+  EXPECT_TRUE(shouldCreateLatestSnapshotForManualSync(false, false));
+  EXPECT_FALSE(shouldCreateLatestSnapshotForManualSync(true, false));
+  EXPECT_FALSE(shouldCreateLatestSnapshotForManualSync(false, true));
+  EXPECT_FALSE(shouldCreateLatestSnapshotForManualSync(true, true));
+}
+
+TEST(ReadingSyncPolicy, AutomaticSyncBootstrapsOnlyBeforeFirstAcceptedBook) {
+  EXPECT_TRUE(shouldBootstrapLatestSnapshotForAutomaticSync(false, false, false));
+  EXPECT_FALSE(shouldBootstrapLatestSnapshotForAutomaticSync(true, false, false));
+  EXPECT_FALSE(shouldBootstrapLatestSnapshotForAutomaticSync(false, true, false));
+  EXPECT_FALSE(shouldBootstrapLatestSnapshotForAutomaticSync(false, false, true));
+}
+
+TEST(ReadingSyncPolicy, DiscardsOnlyAcceptedFingerprintWithoutDisplaySummary) {
+  EXPECT_TRUE(shouldDiscardOrphanedAcceptedFingerprint(false, false));
+  EXPECT_FALSE(shouldDiscardOrphanedAcceptedFingerprint(false, true));
+  EXPECT_FALSE(shouldDiscardOrphanedAcceptedFingerprint(true, false));
+  EXPECT_FALSE(shouldDiscardOrphanedAcceptedFingerprint(true, true));
+}
+
+TEST(ReadingSyncPolicy, BuildsBoundedMetadataForLatestBookSnapshot) {
+  ReadingSyncMetadata metadata;
+  ASSERT_TRUE(
+      buildReadingSyncMetadataSnapshot("book-42", "테스트 책", "테스트 저자", 37, "2026-07-18T10:00:00Z", metadata));
+  EXPECT_EQ(ReadingSyncMetadata::kWireSchemaVersion, metadata.schemaVersion);
+  EXPECT_EQ(0u, metadata.sequence);
+  EXPECT_EQ("book-42", metadata.bookId);
+  EXPECT_EQ("테스트 책", metadata.title);
+  EXPECT_EQ("테스트 저자", metadata.author);
+  EXPECT_EQ(37, metadata.progressPercent);
+  EXPECT_EQ("2026-07-18T10:00:00Z", metadata.lastReadAt);
+
+  EXPECT_FALSE(buildReadingSyncMetadataSnapshot("book-42", "", "테스트 저자", 37, "", metadata));
+}
+
+TEST(ReadingSyncMetadataValidation, RejectsQueueSchemaAsWireSchema) {
+  ReadingSyncMetadata metadata;
+  metadata.schemaVersion = ReadingSyncQueue::kSchemaVersion;
+  metadata.bookId = "book";
+  metadata.title = "title";
+
+  EXPECT_FALSE(isReadingSyncMetadataBounded(metadata, false));
 }
 
 TEST(ReadingSyncPolicy, FingerprintExcludesTimestamp) {

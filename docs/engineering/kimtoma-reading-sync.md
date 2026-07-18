@@ -5,6 +5,31 @@ This integration is compiled only into `gh_release_ko` and
 statistics before it creates a sync snapshot, and a network failure never
 rolls back local reading data.
 
+## Device experience
+
+The Korean build uses the approved 120x120 monochrome profile mark on the
+default boot and sleep screens, centered from the oriented screen dimensions,
+with `@kimtoma` underneath. Custom sleep bitmaps and book-cover sleep screens
+are unchanged. Regenerate and verify the 1,800-byte 1-bit asset with:
+
+```bash
+python3 scripts/gen_kimtoma_mark.py --png /tmp/kimtoma-mark.png
+python3 -m unittest scripts/test_gen_kimtoma_mark.py
+```
+
+The Apps menu contains **kimtoma 서재**. It displays the last server-accepted
+book, author, progress, accepted time, pending record, and cover state without
+turning Wi-Fi on merely by opening the screen. **다시 동기화** reuses the
+one-shot sync worker. **연동 설정** opens the same activity in settings mode.
+
+System settings keeps two separate actions:
+
+1. **kimtoma.com 연동** — status, **연결 테스트**, and manual retry.
+2. **온라인 서재 서버** — the existing generic OPDS server manager.
+
+The raw device token is never displayed or edited on the X4. The settings mode
+directs the user to the protected File Transfer web settings instead.
+
 ## Release gate
 
 Run the complete local gate from the repository root. Build the simulator SKUs
@@ -84,7 +109,7 @@ All integration state is kept on the SD card:
 
 | Path | Purpose |
 |---|---|
-| `/.crosspoint/reading_sync/queue.json` | Atomic single-pending metadata, sequence, auth-pause, terminal state, and optional cover job. Maximum 8 KiB. |
+| `/.crosspoint/reading_sync/queue.json` | Atomic single-pending metadata, sequence, auth-pause, terminal state, optional cover job, and optional last-accepted display summary. Maximum 8 KiB. |
 | `/.crosspoint/reading_sync/queue.json.tmp` | Same-directory atomic-write temporary file. |
 | `/.crosspoint/reading_sync/queue.json.corrupt` | Preserved invalid queue for diagnosis. |
 | `/.crosspoint/reading_sync/config.json` | Schema version and obfuscated device token. Maximum 8 KiB. |
@@ -98,6 +123,19 @@ stops sending, and local reading remains available. Power the device off before
 repair: copy `queue.json` and `queue.json.corrupt` for diagnosis, remove only
 the invalid `queue.json`, then reboot. This restarts with an empty sync queue;
 it does not remove the normal reading-statistics store.
+
+`queue.json` is schema 2. The network API payload remains wire schema 1; these
+versions are deliberately independent. A schema-1 queue migrates atomically to
+schema 2 while preserving pending metadata, cover work, authentication pause,
+terminal state, and accepted fingerprint. It starts without a display summary
+until the next `accepted` or `duplicate` response. `stale` advances the queue
+but does not replace the last-accepted display book. Unknown future queue
+schemas are preserved as corrupt instead of being overwritten.
+
+The dashboard state priority is fixed: queue corrupt, token not configured,
+authentication required, worker running, pending, then ready. A connection
+test and a sync cannot run concurrently. Both operations release reading-stat
+memory before Wi-Fi/TLS and restore it while tearing Wi-Fi down on every exit.
 
 Only original JPEG and PNG covers up to 2,097,152 bytes are staged. A missing,
 unsupported, malformed, or oversized cover does not block metadata sync. The
@@ -134,11 +172,12 @@ JPEG/PNG/no-cover/oversized-cover cases, cancellation, and ten consecutive
 syncs with free heap above 50 KiB and no downward trend.
 
 If acceptance fails, stop the test, preserve serial logs with credentials
-redacted, and restore the previous `firmware-ko.bin` through the device's SD
-Card Firmware Update file picker or the web flasher's X4 target. Those paths
-write the next OTA partition and update boot selection together. Do not treat a
-raw write to a fixed app offset as a complete A/B rollback because OTA boot
-metadata may still select the other slot.
+redacted, and restore the previous `firmware-ko.bin` through the web flasher's
+X4 target. Some installed builds do not expose an SD Card Firmware Update menu,
+so do not depend on that path. The supported flasher writes the next OTA
+partition and updates boot selection together. Do not treat a raw write to a
+fixed app offset as a complete A/B rollback because OTA boot metadata may still
+select the other slot.
 
 For any USB recovery, re-detect the port, verify the ESP32-C3 identity, preserve
 the previous image and its hash, and obtain explicit approval before running

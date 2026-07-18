@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -26,4 +27,5 @@ struct ReadingSyncWireResponse {
 bool validateReadingSyncResponse(const ReadingSyncWireResponse& wire, uint32_t expectedSequence,
                                  ReadingSyncResponse& out);
 bool isReadingSyncBookIdBounded(const std::string& bookId);
+bool isReadingSyncTextBounded(const std::string& value, size_t utf16Limit, bool requireNonWhitespace);
 bool isReadingSyncMetadataBounded(const ReadingSyncMetadata& metadata, bool requireSequence);

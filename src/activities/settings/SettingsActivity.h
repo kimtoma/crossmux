@@ -19,6 +19,9 @@ enum class SettingAction {
   KOReaderSync,
 #endif
   OPDSBrowser,
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  KimtomaIntegration,
+#endif
   Network,
   ClearCache,
   CheckForUpdates,

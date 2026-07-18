@@ -9,6 +9,7 @@
 
 #include "ReadingSyncPolicy.h"
 #include "ReadingSyncResponseValidation.h"
+#include "util/TimeUtils.h"
 
 namespace {
 constexpr char QUEUE_DIRECTORY[] = "/.crosspoint/reading_sync";
@@ -78,9 +79,11 @@ bool ReadingSyncQueue::loadFromFile() {
   }
 
   ReadingSyncQueue loaded;
+  uint32_t sourceSchema = 0;
   if (parsed && document.is<JsonObjectConst>()) {
     const JsonObjectConst root = document.as<JsonObjectConst>();
-    parsed = root["schemaVersion"].is<uint32_t>() && root["schemaVersion"].as<uint32_t>() == kSchemaVersion &&
+    sourceSchema = root["schemaVersion"] | 0u;
+    parsed = root["schemaVersion"].is<uint32_t>() && (sourceSchema == 1 || sourceSchema == kSchemaVersion) &&
              root["nextSequence"].is<uint32_t>() && root["nextSequence"].as<uint32_t>() != 0 &&
              isRequiredString(root, "lastAcceptedFingerprint", true) && root["authPaused"].is<bool>() &&
              root["terminal"].is<bool>() && isRequiredString(root, "terminalReason", true);
@@ -100,7 +103,7 @@ bool ReadingSyncQueue::loadFromFile() {
       if (parsed) {
         const JsonObjectConst pending = root["pending"].as<JsonObjectConst>();
         parsed = pending["schemaVersion"].is<uint32_t>() &&
-                 pending["schemaVersion"].as<uint32_t>() == ReadingSyncQueue::kSchemaVersion &&
+                 pending["schemaVersion"].as<uint32_t>() == ReadingSyncMetadata::kWireSchemaVersion &&
                  pending["sequence"].is<uint32_t>() && pending["sequence"].as<uint32_t>() != 0 &&
                  isRequiredString(pending, "bookId") && isRequiredString(pending, "title") &&
                  isRequiredString(pending, "author", true) && pending["progressPercent"].is<uint32_t>() &&
@@ -143,6 +146,28 @@ bool ReadingSyncQueue::loadFromFile() {
       }
     }
 
+    if (parsed && sourceSchema == kSchemaVersion && !root["lastAccepted"].isNull()) {
+      parsed = root["lastAccepted"].is<JsonObjectConst>();
+      if (parsed) {
+        const JsonObjectConst accepted = root["lastAccepted"].as<JsonObjectConst>();
+        parsed = isRequiredString(accepted, "title") && isRequiredString(accepted, "author", true) &&
+                 accepted["progressPercent"].is<uint32_t>() && accepted["progressPercent"].as<uint32_t>() <= 100 &&
+                 isRequiredString(accepted, "lastReadAt", true) && accepted["acceptedAt"].is<uint32_t>() &&
+                 isRequiredString(accepted, "coverState");
+        if (parsed) {
+          loaded.hasLastAccepted_ = true;
+          loaded.lastAccepted_.title = accepted["title"].as<const char*>();
+          loaded.lastAccepted_.author = accepted["author"].as<const char*>();
+          loaded.lastAccepted_.progressPercent = accepted["progressPercent"].as<uint8_t>();
+          loaded.lastAccepted_.lastReadAt = accepted["lastReadAt"].as<const char*>();
+          loaded.lastAccepted_.acceptedAt = accepted["acceptedAt"].as<uint32_t>();
+          parsed =
+              parseReadingSyncCoverState(accepted["coverState"].as<const char*>(), loaded.lastAccepted_.coverState) &&
+              isReadingSyncAcceptedSummaryValid(loaded.lastAccepted_);
+        }
+      }
+    }
+
     if (parsed) {
       parsed = isReadingSyncQueueStateValid(loaded.terminal_, loaded.hasPending_, loaded.hasCover_);
     }
@@ -154,7 +179,18 @@ bool ReadingSyncQueue::loadFromFile() {
     return false;
   }
 
+  const bool repairedAcceptedFingerprint =
+      shouldDiscardOrphanedAcceptedFingerprint(loaded.hasLastAccepted_, loaded.lastAcceptedFingerprint_.empty());
+  if (repairedAcceptedFingerprint) {
+    loaded.lastAcceptedFingerprint_.clear();
+  }
+
+  ReadingSyncQueue previous = *this;
   *this = std::move(loaded);
+  if ((sourceSchema == 1 || repairedAcceptedFingerprint) && !saveAtomic()) {
+    *this = std::move(previous);
+    return false;
+  }
   return true;
 }
 
@@ -253,6 +289,10 @@ const ReadingCoverJob* ReadingSyncQueue::coverPending() const {
   return !terminal_ && !corrupt_ && hasCover_ ? &cover_ : nullptr;
 }
 
+const ReadingSyncAcceptedSummary* ReadingSyncQueue::lastAccepted() const {
+  return !corrupt_ && hasLastAccepted_ ? &lastAccepted_ : nullptr;
+}
+
 bool ReadingSyncQueue::clearCoverJob(const std::string& bookId, const std::string& sha256) {
   if (corrupt_ || !hasCover_ || !matchesReadingCoverJob(cover_, bookId, sha256)) {
     return false;
@@ -261,6 +301,9 @@ bool ReadingSyncQueue::clearCoverJob(const std::string& bookId, const std::strin
   ReadingSyncQueue previous = *this;
   hasCover_ = false;
   cover_ = {};
+  if (hasLastAccepted_ && lastAccepted_.coverState == ReadingSyncCoverState::Pending) {
+    lastAccepted_.coverState = ReadingSyncCoverState::Uploaded;
+  }
   if (saveAtomic()) {
     return true;
   }
@@ -291,8 +334,17 @@ bool ReadingSyncQueue::applyServerResult(const uint32_t requestSequence, const u
   }
 
   nextSequence_ = advanced;
-  if (status == ReadingSyncServerStatus::Accepted || status == ReadingSyncServerStatus::Duplicate) {
+  if (shouldReplaceAcceptedSummary(status)) {
     lastAcceptedFingerprint_ = makeReadingFingerprint(pending_);
+    lastAccepted_.title = pending_.title;
+    lastAccepted_.author = pending_.author;
+    lastAccepted_.progressPercent = pending_.progressPercent;
+    lastAccepted_.lastReadAt = pending_.lastReadAt;
+    lastAccepted_.acceptedAt = TimeUtils::getAuthoritativeTimestamp();
+    lastAccepted_.coverState = pending_.coverSha256.empty()
+                                   ? ReadingSyncCoverState::None
+                                   : (keepCover ? ReadingSyncCoverState::Pending : ReadingSyncCoverState::Uploaded);
+    hasLastAccepted_ = isReadingSyncAcceptedSummaryValid(lastAccepted_);
   }
   hasPending_ = false;
   pending_ = {};
@@ -388,6 +440,15 @@ bool ReadingSyncQueue::saveAtomic() const {
     cover["sha256"] = cover_.sha256.c_str();
     cover["mime"] = cover_.mime.c_str();
     cover["path"] = cover_.path.c_str();
+  }
+  if (hasLastAccepted_) {
+    JsonObject accepted = document["lastAccepted"].to<JsonObject>();
+    accepted["title"] = lastAccepted_.title.c_str();
+    accepted["author"] = lastAccepted_.author.c_str();
+    accepted["progressPercent"] = lastAccepted_.progressPercent;
+    accepted["lastReadAt"] = lastAccepted_.lastReadAt.c_str();
+    accepted["acceptedAt"] = lastAccepted_.acceptedAt;
+    accepted["coverState"] = readingSyncCoverStateName(lastAccepted_.coverState);
   }
 
   const size_t serializedSize = measureJson(document);

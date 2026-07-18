@@ -326,6 +326,36 @@ HttpDownloader::HttpResult ReadingSyncClient::uploadCover(const ReadingCoverJob&
       1024);
 }
 
+KimtomaConnectionTestState ReadingSyncClient::performValidation(ReadingSyncCredentialStore& credentials,
+                                                                const std::atomic_bool* cancelFlag) {
+  if (isCancelled(cancelFlag)) {
+    return KimtomaConnectionTestState::NetworkFailed;
+  }
+  if (!credentials.hasToken()) {
+    return KimtomaConnectionTestState::AuthenticationFailed;
+  }
+
+  NetworkLifecycle networkLifecycle;
+  if (!READING_STATS.releaseMemoryForNetwork()) {
+    return KimtomaConnectionTestState::NetworkFailed;
+  }
+  networkLifecycle.markStatsReleased();
+
+  networkLifecycle.markWifiStarted();
+  if (!connectSavedWifi(cancelFlag)) {
+    return KimtomaConnectionTestState::NetworkFailed;
+  }
+
+  const HttpDownloader::HttpResult result = validate(credentials.tokenForRequest(), cancelFlag);
+  if (result.statusCode == 200 && result.error == HttpDownloader::OK) {
+    return KimtomaConnectionTestState::Succeeded;
+  }
+  if ((result.statusCode == 401 || result.statusCode == 403) && result.error == HttpDownloader::AUTH_FAILED) {
+    return KimtomaConnectionTestState::AuthenticationFailed;
+  }
+  return KimtomaConnectionTestState::NetworkFailed;
+}
+
 void ReadingSyncClient::performPendingSync(ReadingSyncQueue& queue, ReadingSyncCredentialStore& credentials,
                                            const std::atomic_bool* cancelFlag) {
   if (isCancelled(cancelFlag) || queue.isCorrupt() || queue.authenticationPaused() || !credentials.hasToken() ||
@@ -334,14 +364,18 @@ void ReadingSyncClient::performPendingSync(ReadingSyncQueue& queue, ReadingSyncC
   }
 
   NetworkLifecycle networkLifecycle;
-  networkLifecycle.markWifiStarted();
-  if (!connectSavedWifi(cancelFlag)) {
-    return;
-  }
+  // Free the stats vectors before the Wi-Fi driver fragments the remaining
+  // heap. TLS needs multiple contiguous blocks even when total free heap looks
+  // sufficient on the ESP32-C3.
   if (!READING_STATS.releaseMemoryForNetwork()) {
     return;
   }
   networkLifecycle.markStatsReleased();
+
+  networkLifecycle.markWifiStarted();
+  if (!connectSavedWifi(cancelFlag)) {
+    return;
+  }
 
   const std::string& token = credentials.tokenForRequest();
   const ReadingSyncMetadata* pending = queue.pending();

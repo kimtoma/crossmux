@@ -122,12 +122,10 @@ bool ReadingSyncCoordinator::enqueueAfterSession(const ReadingSessionSnapshot& s
   }
 
   ReadingSyncMetadata metadata;
-  metadata.schemaVersion = ReadingSyncQueue::kSchemaVersion;
-  metadata.bookId = std::move(bookId);
-  metadata.title = book.title;
-  metadata.author = book.author;
-  metadata.progressPercent = snapshot.endProgressPercent;
-  metadata.lastReadAt = formatUtcRfc3339(book.lastReadAt);
+  if (!buildReadingSyncMetadataSnapshot(bookId, book.title, book.author, snapshot.endProgressPercent,
+                                        formatUtcRfc3339(book.lastReadAt), metadata)) {
+    return false;
+  }
 
   ReadingCoverJob stagedCover;
   bool createdNewCoverFile = false;
@@ -161,33 +159,96 @@ bool ReadingSyncCoordinator::enqueueAfterSession(const ReadingSessionSnapshot& s
   return true;
 }
 
-void ReadingSyncCoordinator::startOneShotIfPending() {
+bool ReadingSyncCoordinator::enqueueLatestBookSnapshot() {
+  const auto& books = READING_STATS.getBooks();
+  if (books.empty()) {
+    return false;
+  }
+
+  const ReadingBookStats& book = books.front();
+  std::string resolvedBookId = book.bookId;
+  if (resolvedBookId.empty()) {
+    resolvedBookId = BookIdentity::resolveStableBookId(book.path);
+  }
+  std::string bookId = publicBookId(std::move(resolvedBookId));
+  ReadingSyncMetadata metadata;
+  if (!buildReadingSyncMetadataSnapshot(bookId, book.title, book.author, book.lastProgressPercent,
+                                        formatUtcRfc3339(book.lastReadAt), metadata)) {
+    return false;
+  }
+
+  // The queue takes one bounded metadata copy for durable ownership. Manual
+  // bootstrap intentionally omits cover staging so Wi-Fi/TLS can start without
+  // opening an EPUB or allocating an image decoder on this constrained path.
+  return READING_SYNC_QUEUE.enqueue(std::move(metadata), nullptr);
+}
+
+bool ReadingSyncCoordinator::startOperation(const ReadingSyncWorkerOperation operation, const bool requirePending) {
+  if (operation == ReadingSyncWorkerOperation::None || !READING_SYNC_CREDENTIALS.hasToken()) {
+    return false;
+  }
+
   bool expected = false;
   // Acquire ownership before inspecting queue or credential state. A prior
   // worker publishes all queue/stats cleanup through its release store.
   if (!running_.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
-    return;
+    return false;
   }
 
   manualRetryRequested_.exchange(false, std::memory_order_relaxed);
-  if (READING_SYNC_QUEUE.isCorrupt() || READING_SYNC_QUEUE.authenticationPaused() ||
-      !READING_SYNC_CREDENTIALS.hasToken() ||
-      (READING_SYNC_QUEUE.pending() == nullptr && READING_SYNC_QUEUE.coverPending() == nullptr)) {
+  if (operation == ReadingSyncWorkerOperation::Sync &&
+      (READING_SYNC_QUEUE.isCorrupt() || READING_SYNC_QUEUE.authenticationPaused() ||
+       (requirePending && READING_SYNC_QUEUE.pending() == nullptr && READING_SYNC_QUEUE.coverPending() == nullptr))) {
     running_.store(false, std::memory_order_release);
-    return;
+    return false;
   }
 
   cancelRequested_.store(false, std::memory_order_relaxed);
+  operation_.store(operation, std::memory_order_release);
+  if (operation == ReadingSyncWorkerOperation::Validate) {
+    connectionTestState_.store(KimtomaConnectionTestState::Running, std::memory_order_release);
+  }
 
   const BaseType_t created =
       xTaskCreate(&ReadingSyncCoordinator::taskEntry, "ReadingSync", READING_SYNC_TASK_STACK_BYTES, this, 1, nullptr);
   if (created != pdPASS) {
+    operation_.store(ReadingSyncWorkerOperation::None, std::memory_order_release);
+    if (operation == ReadingSyncWorkerOperation::Validate) {
+      connectionTestState_.store(KimtomaConnectionTestState::NetworkFailed, std::memory_order_release);
+    }
     running_.store(false, std::memory_order_release);
     LOG_ERR("RSY", "Could not create reading sync task");
+    return false;
   }
+  return true;
+}
+
+void ReadingSyncCoordinator::startOneShotIfPending() {
+  const bool hasPending = READING_SYNC_QUEUE.pending() != nullptr;
+  const bool hasCover = READING_SYNC_QUEUE.coverPending() != nullptr;
+  const bool hasAccepted = READING_SYNC_QUEUE.lastAccepted() != nullptr;
+  const bool shouldBootstrap = shouldBootstrapLatestSnapshotForAutomaticSync(hasPending, hasCover, hasAccepted);
+  if (shouldBootstrap) {
+    enqueueLatestBookSnapshot();
+  }
+  startOperation(ReadingSyncWorkerOperation::Sync, true);
 }
 
 void ReadingSyncCoordinator::requestManualRetry() { manualRetryRequested_.store(true, std::memory_order_relaxed); }
+
+bool ReadingSyncCoordinator::requestManualRetryAndStart() {
+  manualRetryRequested_.store(true, std::memory_order_relaxed);
+  if (shouldCreateLatestSnapshotForManualSync(READING_SYNC_QUEUE.pending() != nullptr,
+                                              READING_SYNC_QUEUE.coverPending() != nullptr) &&
+      !enqueueLatestBookSnapshot()) {
+    return false;
+  }
+  return startOperation(ReadingSyncWorkerOperation::Sync, true);
+}
+
+bool ReadingSyncCoordinator::requestConnectionTest() {
+  return startOperation(ReadingSyncWorkerOperation::Validate, false);
+}
 
 void ReadingSyncCoordinator::requestCancel() { cancelRequested_.store(true, std::memory_order_relaxed); }
 
@@ -201,9 +262,37 @@ void ReadingSyncCoordinator::waitUntilStopped() const {
 
 bool ReadingSyncCoordinator::isRunning() const { return running_.load(std::memory_order_acquire); }
 
+KimtomaConnectionTestState ReadingSyncCoordinator::connectionTestState() const {
+  return connectionTestState_.load(std::memory_order_acquire);
+}
+
+ReadingSyncWorkerOperation ReadingSyncCoordinator::workerOperation() const {
+  return operation_.load(std::memory_order_acquire);
+}
+
 void ReadingSyncCoordinator::taskEntry(void* context) {
   auto* coordinator = static_cast<ReadingSyncCoordinator*>(context);
-  READING_SYNC_CLIENT.performPendingSync(READING_SYNC_QUEUE, READING_SYNC_CREDENTIALS, &coordinator->cancelRequested_);
+  const ReadingSyncWorkerOperation operation = coordinator->operation_.load(std::memory_order_acquire);
+  switch (operation) {
+    case ReadingSyncWorkerOperation::Sync:
+      READING_SYNC_CLIENT.performPendingSync(READING_SYNC_QUEUE, READING_SYNC_CREDENTIALS,
+                                             &coordinator->cancelRequested_);
+      break;
+    case ReadingSyncWorkerOperation::Validate: {
+      const KimtomaConnectionTestState result =
+          READING_SYNC_CLIENT.performValidation(READING_SYNC_CREDENTIALS, &coordinator->cancelRequested_);
+      if (result == KimtomaConnectionTestState::Succeeded) {
+        READING_SYNC_QUEUE.resumeAuthentication();
+      } else if (result == KimtomaConnectionTestState::AuthenticationFailed) {
+        READING_SYNC_QUEUE.pauseAuthentication();
+      }
+      coordinator->connectionTestState_.store(result, std::memory_order_release);
+      break;
+    }
+    case ReadingSyncWorkerOperation::None:
+      break;
+  }
+  coordinator->operation_.store(ReadingSyncWorkerOperation::None, std::memory_order_release);
   coordinator->running_.store(false, std::memory_order_release);
   vTaskDelete(nullptr);
 }

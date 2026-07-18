@@ -15,8 +15,22 @@
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#ifdef ENABLE_KOREAN_VERSION
+#include "images/KimtomaMark120.h"
+#else
 #include "images/Logo120.h"
+#endif
 #include "images/MoonIcon.h"
+
+namespace {
+#ifdef ENABLE_KOREAN_VERSION
+constexpr const uint8_t* kSleepMark = KIMTOMA_MARK_120;
+constexpr StrId kSleepBrand = StrId::STR_KIMTOMA_BRAND;
+#else
+constexpr const uint8_t* kSleepMark = Logo120;
+constexpr StrId kSleepBrand = StrId::STR_CROSSPOINT;
+#endif
+}  // namespace
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -156,8 +170,8 @@ void SleepActivity::renderDefaultSleepScreen() const {
   const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
-  renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
+  renderer.drawImage(kSleepMark, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
+  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, I18N.get(kSleepBrand), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
 
   // Make sleep screen dark unless light is selected in settings

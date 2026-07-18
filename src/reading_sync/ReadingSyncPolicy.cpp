@@ -1,6 +1,9 @@
 #include "ReadingSyncPolicy.h"
 
 #include <climits>
+#include <utility>
+
+#include "ReadingSyncResponseValidation.h"
 
 namespace {
 constexpr uint32_t MINIMUM_SYNC_SESSION_MS = 180000u;
@@ -17,6 +20,38 @@ bool qualifiesForReadingSync(const ReadingSyncSessionCandidate& candidate) {
   const int progressDelta =
       static_cast<int>(candidate.endProgressPercent) - static_cast<int>(candidate.startProgressPercent);
   return candidate.sessionMs >= MINIMUM_SYNC_SESSION_MS || progressDelta >= 1 || candidate.completedThisSession;
+}
+
+bool isReadingSyncHomeReady(const bool firstRenderDone, const bool recentsLoaded, const bool recentsLoading) {
+  return firstRenderDone && recentsLoaded && !recentsLoading;
+}
+
+bool shouldCreateLatestSnapshotForManualSync(const bool hasPending, const bool hasCover) {
+  return !hasPending && !hasCover;
+}
+
+bool shouldBootstrapLatestSnapshotForAutomaticSync(const bool hasPending, const bool hasCover, const bool hasAccepted) {
+  return !hasPending && !hasCover && !hasAccepted;
+}
+
+bool shouldDiscardOrphanedAcceptedFingerprint(const bool hasAcceptedSummary, const bool fingerprintEmpty) {
+  return !hasAcceptedSummary && !fingerprintEmpty;
+}
+
+bool buildReadingSyncMetadataSnapshot(const std::string& bookId, const std::string& title, const std::string& author,
+                                      const uint8_t progressPercent, const std::string& lastReadAt,
+                                      ReadingSyncMetadata& out) {
+  ReadingSyncMetadata metadata;
+  metadata.bookId = bookId;
+  metadata.title = title;
+  metadata.author = author;
+  metadata.progressPercent = progressPercent;
+  metadata.lastReadAt = lastReadAt;
+  if (!isReadingSyncMetadataBounded(metadata, false)) {
+    return false;
+  }
+  out = std::move(metadata);
+  return true;
 }
 
 std::string makeReadingFingerprint(const ReadingSyncMetadata& metadata) {

@@ -2,8 +2,10 @@ add_executable(reading_sync_tests
   EpubCoverPolicyTest.cpp
   ReadingSyncClientPolicyTest.cpp
   ReadingSyncPolicyTest.cpp
+  ReadingSyncUiPolicyTest.cpp
   ${REPO_ROOT}/src/reading_sync/ReadingSyncPolicy.cpp
   ${REPO_ROOT}/src/reading_sync/ReadingSyncResponseValidation.cpp
+  ${REPO_ROOT}/src/reading_sync/ReadingSyncUiPolicy.cpp
 )
 target_include_directories(reading_sync_tests PRIVATE
   ${REPO_ROOT}/src

@@ -23,6 +23,8 @@ static_assert(
                           const ReadingSyncMetadata&, const std::string&, ReadingSyncResponse&, AtomicCancelFlag>);
 static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&ReadingSyncClient::validate),
                                     ReadingSyncClient&, const std::string&, AtomicCancelFlag>);
+static_assert(std::is_invocable_r_v<KimtomaConnectionTestState, decltype(&ReadingSyncClient::performValidation),
+                                    ReadingSyncClient&, ReadingSyncCredentialStore&, AtomicCancelFlag>);
 static_assert(std::is_invocable_r_v<HttpDownloader::HttpResult, decltype(&ReadingSyncClient::uploadCover),
                                     ReadingSyncClient&, const ReadingCoverJob&, const std::string&, AtomicCancelFlag>);
 static_assert(std::is_invocable_r_v<void, decltype(&ReadingSyncClient::performPendingSync), ReadingSyncClient&,

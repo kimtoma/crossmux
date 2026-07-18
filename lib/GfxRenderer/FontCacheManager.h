@@ -16,6 +16,10 @@ class FontCacheManager {
   void setFontDecompressor(FontDecompressor* d);
 
   void clearCache();
+  // Clears both per-render glyph data and the SD-font advance tables that
+  // intentionally survive clearCache(). Use only at lifecycle boundaries
+  // where the tables can be rebuilt lazily, such as before networking.
+  void clearAllCaches();
   void prewarmCache(int fontId, const char* utf8Text, uint8_t styleMask = 0x0F);
   void logStats(const char* label = "render");
   void resetStats();

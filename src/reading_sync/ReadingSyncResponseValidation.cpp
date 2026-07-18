@@ -98,14 +98,18 @@ bool isLowercaseSha256(const std::string& sha256) {
 
 bool isReadingSyncBookIdBounded(const std::string& bookId) { return isBookIdSafe(bookId); }
 
+bool isReadingSyncTextBounded(const std::string& value, const size_t utf16Limit, const bool requireNonWhitespace) {
+  return (!requireNonWhitespace || hasNonWhitespace(value)) && utf16LengthWithin(value, utf16Limit);
+}
+
 bool isReadingSyncMetadataBounded(const ReadingSyncMetadata& metadata, const bool requireSequence) {
-  if (metadata.schemaVersion != 1 || (requireSequence && metadata.sequence == 0) ||
-      !isReadingSyncBookIdBounded(metadata.bookId) || metadata.title.empty() || !hasNonWhitespace(metadata.title) ||
-      !utf16LengthWithin(metadata.title, 300) || !utf16LengthWithin(metadata.author, 200) ||
-      metadata.progressPercent > 100) {
+  if (metadata.schemaVersion != ReadingSyncMetadata::kWireSchemaVersion ||
+      (requireSequence && metadata.sequence == 0) || !isReadingSyncBookIdBounded(metadata.bookId) ||
+      metadata.title.empty() || !isReadingSyncTextBounded(metadata.title, 300, true) ||
+      !isReadingSyncTextBounded(metadata.author, 200, false) || metadata.progressPercent > 100) {
     return false;
   }
-  if ((!metadata.lastReadAt.empty() && !utf16LengthWithin(metadata.lastReadAt, 64)) ||
+  if ((!metadata.lastReadAt.empty() && !isReadingSyncTextBounded(metadata.lastReadAt, 64, false)) ||
       (!metadata.isbn13.empty() && !isValidIsbn13(metadata.isbn13))) {
     return false;
   }

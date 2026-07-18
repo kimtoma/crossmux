@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -24,6 +25,9 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+#include "activities/apps/kimtoma/KimtomaLibraryActivity.h"
+#endif
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -66,6 +70,9 @@ void SettingsActivity::rebuildSettingsLists() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
 #if !defined(ENABLE_KOREAN_VERSION)
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
+#endif
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_KIMTOMA_INTEGRATION, SettingAction::KimtomaIntegration));
 #endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
@@ -246,6 +253,17 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::KOReaderSync:
         startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
+#endif
+#ifdef ENABLE_KIMTOMA_READING_SYNC
+      case SettingAction::KimtomaIntegration: {
+        auto activity = makeUniqueNoThrow<KimtomaLibraryActivity>(renderer, mappedInput, KimtomaLibraryMode::Settings);
+        if (!activity) {
+          LOG_ERR("SET", "Could not allocate kimtoma integration activity");
+          break;
+        }
+        startActivityForResult(std::move(activity), resultHandler);
+        break;
+      }
 #endif
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);

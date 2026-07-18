@@ -5,6 +5,7 @@
 #include <string>
 
 #include "ReadingSyncResponseValidation.h"
+#include "ReadingSyncUiPolicy.h"
 
 struct ReadingCoverJob {
   std::string bookId;
@@ -69,13 +70,14 @@ inline bool matchesReadingCoverJob(const ReadingCoverJob& cover, const std::stri
 
 class ReadingSyncQueue {
  public:
-  static constexpr uint8_t kSchemaVersion = 1;
+  static constexpr uint8_t kSchemaVersion = 2;
 
   static ReadingSyncQueue& getInstance();
   bool loadFromFile();
   bool enqueue(ReadingSyncMetadata metadata, const ReadingCoverJob* cover);
   const ReadingSyncMetadata* pending() const;
   const ReadingCoverJob* coverPending() const;
+  const ReadingSyncAcceptedSummary* lastAccepted() const;
   bool clearCoverJob(const std::string& bookId, const std::string& sha256);
   bool applyServerResult(uint32_t requestSequence, uint32_t lastAcceptedSequence, ReadingSyncServerStatus status,
                          bool keepCover);
@@ -91,6 +93,7 @@ class ReadingSyncQueue {
   uint32_t nextSequence_ = 1;
   bool hasPending_ = false;
   bool hasCover_ = false;
+  bool hasLastAccepted_ = false;
   bool authPaused_ = false;
   bool terminal_ = false;
   bool corrupt_ = false;
@@ -98,6 +101,7 @@ class ReadingSyncQueue {
   std::string terminalReason_;
   ReadingSyncMetadata pending_;
   ReadingCoverJob cover_;
+  ReadingSyncAcceptedSummary lastAccepted_;
 };
 
 #define READING_SYNC_QUEUE ReadingSyncQueue::getInstance()

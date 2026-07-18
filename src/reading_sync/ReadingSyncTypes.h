@@ -4,7 +4,9 @@
 #include <string>
 
 struct ReadingSyncMetadata {
-  uint8_t schemaVersion = 1;
+  static constexpr uint8_t kWireSchemaVersion = 1;
+
+  uint8_t schemaVersion = kWireSchemaVersion;
   uint32_t sequence = 0;
   std::string bookId;
   std::string title;
